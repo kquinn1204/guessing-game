@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs-app
+  namespace: music-game
+  labels:
+    app: nodejs-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nodejs-app
+  template:
+    metadata:
+      labels:
+        app: nodejs-app
+    spec:
+      containers:
+      - name: nodejs-app
+        image: quay.io/rhn_support_kquinn/mongodbappbe-advanced:latest
+        ports:
+        - containerPort: 3000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: MONGO_URL
+          value: 'mongodb://mongodb-service:27017'
+        - name: DB_NAME
+          value: musicgame
+        - name: ALLOWED_ORIGINS
+          valueFrom:
+            configMapKeyRef:
+              name: frontend-config
+              key: ALLOWED_ORIGINS
+        - name: BACKEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: backend-config
+              key: BACKEND_URL
+

@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb
+  namespace: music-game
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      securityContext:
+        fsGroup: 1000710000
+      containers:
+      - name: mongodb
+        image: quay.io/rhn_support_kquinn/mymongodb-advanced:latest
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongodb-data
+          mountPath: /data/db
+          readOnly: false
+        securityContext:
+          runAsUser: 1000710000
+          privileged: true  # Set the container to run in privileged mode
+      volumes:
+      - name: mongodb-data
+        persistentVolumeClaim:
+          claimName: mongodb-pvc

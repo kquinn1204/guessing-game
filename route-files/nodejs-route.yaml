@@ -1,0 +1,11 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: nodejs-route
+  namespace: music-game
+spec:
+  to:
+    kind: Service
+    name: nodejs-service
+  port:
+    targetPort: 3000

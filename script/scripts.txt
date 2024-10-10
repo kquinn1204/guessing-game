@@ -1,0 +1,8 @@
+# run as privledged to get around permissions issue with writing to directory.
+oc adm policy add-scc-to-user privileged -z default -n music-game
+
+# create configmap to dynamically determine and populate BACKEND_URL
+oc create configmap backend-config -n music-game --from-literal=BACKEND_URL=$(oc get route nodejs-route -n music-game -o jsonpath='{.spec.host}')
+
+# create configmap to dynamically determine and populate BACKEND_URL
+oc create configmap frontend-config -n music-game --from-literal=ALLOWED_ORIGINS=$(oc get route nginx-route -n music-game -o jsonpath='{.spec.host}')

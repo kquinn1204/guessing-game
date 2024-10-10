@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-html-service
+  namespace: music-game
+spec:
+  type: LoadBalancer
+  selector:
+    app: nginx  # Match this with the pod label
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-service
+  namespace: music-game  # Ensure this matches your deployment namespace
+spec:
+  selector:
+    app: mongodb  # Must match the label in your MongoDB Deployment
+  ports:
+    - protocol: TCP
+      port: 27017       # Port the service exposes
+      targetPort: 27017 # Port on the MongoDB container

@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: quay.io/rhn_support_kquinn/mongodbappbe-advanced:latest
+        image: quay.io/rhn_support_kquinn/mongodbappbe-adv-working:latest
         ports:
         - containerPort: 3000
         resources:

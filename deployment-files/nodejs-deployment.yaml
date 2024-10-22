@@ -6,7 +6,7 @@ metadata:
   labels:
     app: nodejs-app
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: nodejs-app
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: quay.io/rhn_support_kquinn/mongodbappbe-adv-working:latest
+        image: quay.io/rhn_support_kquinn/middleware-node-js-app-conns-pooling:latest
         ports:
         - containerPort: 3000
         resources:

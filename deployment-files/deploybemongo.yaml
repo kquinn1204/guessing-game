@@ -4,7 +4,7 @@ metadata:
   name: mongodb
   namespace: music-game
 spec:
-  replicas: 1
+  replicas: 3
   selector:
     matchLabels:
       app: mongodb
@@ -17,7 +17,7 @@ spec:
         fsGroup: 1000710000
       containers:
       - name: mongodb
-        image: quay.io/rhn_support_kquinn/mymongodb-adv-working:latest
+        image: quay.io/rhn_support_kquinn/mymongodb-advanced-v2:latest
         ports:
         - containerPort: 27017
         volumeMounts:

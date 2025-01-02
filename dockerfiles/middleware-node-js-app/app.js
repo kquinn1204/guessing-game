@@ -160,6 +160,42 @@ app.get('/test-db', async (req, res) => {
     }
 });
 
+// Add this new route to your Node.js backend
+app.get('/leaderboard', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const playersCollection = db.collection('players');
+        
+        // Get top 10 players based on correct guesses
+        const leaderboard = await playersCollection
+            .find({})
+            .project({
+                playerName: 1,
+                correctSongGuesses: 1,
+                correctArtistGuesses: 1,
+                timestamp: 1
+            })
+            .sort({ 
+                correctSongGuesses: -1,
+                correctArtistGuesses: -1 
+            })
+            .limit(10)
+            .toArray();
+
+        // Calculate total score for each player
+        const leaderboardWithTotals = leaderboard.map(player => ({
+            ...player,
+            totalScore: (player.correctSongGuesses || 0) + (player.correctArtistGuesses || 0),
+            playedAt: player.timestamp
+        }));
+
+        res.json(leaderboardWithTotals);
+    } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // Middleware to log frontend URL from Referer header
 app.use((req, res, next) => {
     const referer = req.get('Referer');

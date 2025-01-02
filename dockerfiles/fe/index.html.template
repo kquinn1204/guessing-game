@@ -3,140 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Music guessing game where you identify songs and artists.">
     <title>Music Game</title>
-    <script defer src="script.js"></script> <!-- Defer ensures the script loads after HTML -->
+    <script defer src="script.js"></script>
     <style>
-        /* Basic reset and styling */
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-        }
-        #content {
-            background-color: rgba(255, 255, 255, 0.9);
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            width: 90%;
-            max-width: 500px;
-        }
-        input[type="text"], button {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            font-size: 1rem;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
-        button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        #result {
-            margin-top: 20px;
-            font-size: 1rem;
-            color: #333;
-        }
-        #audioPlayer {
-            display: none;
-
-       .hidden {
-            display: none;
-        }
-
-        #leaderboardSection {
-            margin-top: 2rem;
-            padding: 1rem;
-            background-color: rgba(255, 255, 255, 0.9);
-            border-radius: 8px;
-            width: 100%;
-        }
-
-        #leaderboardTable {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-
-        #leaderboardTable th,
-        #leaderboardTable td {
-            padding: 0.5rem;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-
-        #leaderboardTable th {
-            background-color: #f5f5f5;
-            font-weight: bold;
-        }
-
-        #leaderboardTable tr:hover {
-            background-color: #f0f0f0;
-        }
+        body { font-family: Arial, sans-serif; text-align: center; background-size: cover; }
+        #leaderboardSection { margin-top: 2rem; padding: 1rem; background-color: rgba(255, 255, 255, 0.9); }
     </style>
 </head>
 <body>
-    <div id="content">
     <h1>Music Game</h1>
-    <p>Guess the song and artist based on the audio clip!</p>
-
-    <input type="text" id="playerNameInput" placeholder="Enter your name" aria-label="Player Name">
-    <button id="setPlayerNameBtn" aria-label="Set your player name">Set Name</button>
-
-    <button id="playSongBtn" aria-label="Play the next song" disabled>Play Song</button>
-
-    <input type="text" id="songGuessInput" placeholder="Enter your song guess" aria-label="Song Guess">
-    <input type="text" id="artistGuessInput" placeholder="Enter your artist guess" aria-label="Artist Guess">
-
-    <button id="submitGuessBtn" aria-label="Submit your guess" disabled>Submit Guess</button>
-    <button id="submitAllGuessesBtn" aria-label="Submit all guesses" disabled>Submit All Guesses</button>
-
-    <!-- Result Display -->
-    <div id="result" role="alert"></div>
-
-    <!-- Correct Answers Display -->
-    <div id="correctAnswers" role="alert" style="margin-top: 20px; font-weight: bold; color: #28a745;"></div>
-
+    <p id="topPlayer">Top Player: Loading...</p>
+    <button id="playSongBtn" disabled>Play Song</button>
+    <input id="songGuessInput" placeholder="Guess Song" />
+    <input id="artistGuessInput" placeholder="Guess Artist" />
+    <button id="submitGuessBtn" disabled>Submit Guess</button>
+    <button id="submitAllGuessesBtn" disabled>Submit All Guesses</button>
+    <p id="result"></p>
+    <audio id="audioPlayer"></audio>
     <div id="leaderboardSection" class="hidden">
-            <h2>Top Players</h2>
-            <table id="leaderboardTable">
-                <thead>
-                    <tr>
-                        <th>Rank</th>
-                        <th>Player</th>
-                        <th>Songs</th>
-                        <th>Artists</th>
-                        <th>Total</th>
-                        <th>Played</th>
-                    </tr>
-                </thead>
-                <tbody id="leaderboardBody">
-                </tbody>
-            </table>
-        </div>
-</div>
-
-    <!-- Audio element for playing songs -->
-    <audio id="audioPlayer" controls style="display:none;" aria-label="Audio Player"></audio>
+        <h2>Leaderboard</h2>
+        <table>
+            <thead>
+                <tr><th>Rank</th><th>Name</th><th>Song Score</th><th>Artist Score</th><th>Total Score</th></tr>
+            </thead>
+            <tbody id="leaderboardBody"></tbody>
+        </table>
+    </div>
 </body>
 </html>

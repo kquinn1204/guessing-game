@@ -55,7 +55,7 @@ async function connectToDatabase(retries = 5, delay = 2000) {
 
 // POST route to handle guesses from the frontend
 app.post('/submit-guesses', async (req, res) => {
-    const { playerName, guesses } = req.body; 
+    const { playerName, guesses } = req.body;
 
     if (!playerName || !guesses || !Array.isArray(guesses) || guesses.length === 0) {
         return res.status(400).json({ error: 'Invalid input' });
@@ -71,20 +71,20 @@ app.post('/submit-guesses', async (req, res) => {
         let correctArtistCount = 0;
 
         for (let guessData of guesses) {
-        const { songFile, songGuess, artistGuess } = guessData;  // Changed this line
-        const mp3_filename = `${songFile}.mp3`;
+            const { songFile, songGuess, artistGuess } = guessData;
+            const mp3_filename = `${songFile}.mp3`;
 
-        if (!songFile || !songGuess || !artistGuess) {
-           results.push({
-               songFile,
-               songGuess,
-               artistGuess,
-               correctSong: false,
-               correctArtist: false,
-               correctAnswer: 'Incomplete guess data'
-            });
-            continue;
-        }
+            if (!songFile || !songGuess || !artistGuess) {
+                results.push({
+                    songFile,
+                    songGuess,
+                    artistGuess,
+                    correctSong: false,
+                    correctArtist: false,
+                    correctAnswer: 'Incomplete guess data'
+                });
+                continue;
+            }
 
             const song = await songsCollection.findOne({ mp3_filename: mp3_filename });
             if (!song) {
@@ -115,13 +115,11 @@ app.post('/submit-guesses', async (req, res) => {
             });
         }
 
-        // Calculate total possible score and format results for feedback
         const totalPossibleCorrect = guesses.length * 2;
         const correctAnswersFormatted = results.map(result => 
             `Song: ${result.correctAnswer.song}, Artist: ${result.correctAnswer.artist}`
         );
 
-        // Update the player's record in the database
         await playersCollection.updateOne(
             { playerName },
             {
@@ -160,13 +158,12 @@ app.get('/test-db', async (req, res) => {
     }
 });
 
-// Add this new route to your Node.js backend
+// Leaderboard route
 app.get('/leaderboard', async (req, res) => {
     try {
         await connectToDatabase();
         const playersCollection = db.collection('players');
-        
-        // Get top 10 players based on correct guesses
+
         const leaderboard = await playersCollection
             .find({})
             .project({
@@ -175,14 +172,10 @@ app.get('/leaderboard', async (req, res) => {
                 correctArtistGuesses: 1,
                 timestamp: 1
             })
-            .sort({ 
-                correctSongGuesses: -1,
-                correctArtistGuesses: -1 
-            })
+            .sort({ correctSongGuesses: -1, correctArtistGuesses: -1 })
             .limit(10)
             .toArray();
 
-        // Calculate total score for each player
         const leaderboardWithTotals = leaderboard.map(player => ({
             ...player,
             totalScore: (player.correctSongGuesses || 0) + (player.correctArtistGuesses || 0),
@@ -196,17 +189,24 @@ app.get('/leaderboard', async (req, res) => {
     }
 });
 
-// Middleware to log frontend URL from Referer header
-app.use((req, res, next) => {
-    const referer = req.get('Referer');
-    if (referer) {
-        const frontendUrl = new URL(referer).origin;
-        console.log(`Frontend URL: ${frontendUrl}`);
-    }
-    next();
-});
+// Top player route
+app.get('/top-player', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const playersCollection = db.collection('players');
 
-// Start the backend server
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-});
+        const topPlayer = await playersCollection.aggregate([
+            { $addFields: { totalCorrectGuesses: { $add: ["$correctSongGuesses", "$correctArtistGuesses"] } } },
+            { $sort: { totalCorrectGuesses: -1 } },
+            { $limit: 1 },
+            { $project: { playerName: 1, correctSongGuesses: 1, correctArtistGuesses: 1, totalCorrectGuesses: 1, timestamp: 1 } }
+        ]).toArray();
+
+        if (topPlayer.length === 0) {
+            return res.status(404).json({ message: 'No players found' });
+        }
+
+        res.json({
+            playerName: topPlayer[0].playerName,
+            correctSongGuesses: topPlayer[0].correctSongGuesses || 0,
+            correctArtistGuesses: topPlayer[0].correctArtistGuesses

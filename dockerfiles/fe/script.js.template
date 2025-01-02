@@ -1,7 +1,7 @@
 // Script.js for Music Game Application
 
 const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
-const songs = ['song1', 'song2', 'song3', 'song4', 'song5']; // Example list of song files
+const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10']; // Updated to match MongoDB
 const songBackgrounds = {
     song1: 'images/song1-background.jpg',
     song2: 'images/song2-background.jpg',
@@ -17,9 +17,9 @@ const songBackgrounds = {
 
 let currentSongIndex = 0;
 let guesses = [];
-let playerName = ''; // Captured at the start of the game
+let playerName = ''; 
 
-const audioElement = document.getElementById('audio');
+const audioElement = document.getElementById('audioPlayer'); // Updated to match HTML
 const resultElement = document.getElementById('result');
 const playSongBtn = document.getElementById('playSongBtn');
 const submitGuessBtn = document.getElementById('submitGuessBtn');
@@ -64,9 +64,42 @@ function submitGuess() {
         resultElement.innerText = 'Guess submitted! Get ready for the next song.';
 
         submitGuessBtn.disabled = true;
-        setTimeout(playNextSong, 2000); // Delay before playing the next song
+        setTimeout(playNextSong, 2000);
     } else {
-        resultElement.innerText = 'Please enter both a song and an artist guess.';
+        resultElement.innerText = 'Please enter both a song and artist guess.';
+    }
+}
+
+// Single updateLeaderboard function
+async function updateLeaderboard() {
+    try {
+        const response = await fetch(`http://${backendUrl}/leaderboard`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        
+        const leaderboardData = await response.json();
+        const leaderboardBody = document.getElementById('leaderboardBody');
+        leaderboardBody.innerHTML = '';
+        
+        leaderboardData.forEach((player, index) => {
+            const row = document.createElement('tr');
+            const playedDate = new Date(player.playedAt).toLocaleDateString();
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${player.playerName}</td>
+                <td>${player.correctSongGuesses || 0}</td>
+                <td>${player.correctArtistGuesses || 0}</td>
+                <td>${player.totalScore}</td>
+                <td>${playedDate}</td>
+            `;
+            leaderboardBody.appendChild(row);
+        });
+        
+        document.getElementById('leaderboardSection').classList.remove('hidden');
+    } catch (error) {
+        console.error('Error updating leaderboard:', error);
     }
 }
 
@@ -75,33 +108,36 @@ async function submitAllGuesses() {
     submitAllGuessesBtn.innerText = 'Submitting...';
 
     try {
-        const response = await fetch(`${backendUrl}/submit-guesses`, {
+        const response = await fetch(`http://${backendUrl}/submit-guesses`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ playerName, guesses })
         });
-
+        
         if (!response.ok) {
             throw new Error('Failed to submit guesses');
         }
-
+        
         const result = await response.json();
-
         const totalCorrectSongGuesses = result.correctSongGuesses || 0;
         const totalCorrectArtistGuesses = result.correctArtistGuesses || 0;
         const correctAnswers = result.correctAnswers || [];
-
+        
         resultElement.innerText = `
             Game Over! You got ${totalCorrectSongGuesses} song(s) and ${totalCorrectArtistGuesses} artist(s) correct.
             Correct Answers: ${correctAnswers.join(', ')}
         `;
-
+        
+        await updateLeaderboard();
+        
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
     } catch (error) {
         console.error('Error submitting guesses:', error);
         resultElement.innerText = 'Error: Could not submit your guesses. Please try again.';
         submitAllGuessesBtn.disabled = false;
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
+    } finally {
+        submitAllGuessesBtn.disabled = false;
     }
 }
 
@@ -125,6 +161,9 @@ function initializeGame() {
     playSongBtn.disabled = false;
     submitGuessBtn.disabled = true;
     submitAllGuessesBtn.disabled = true;
+    
+    // Load initial leaderboard
+    updateLeaderboard();
 }
 
 initializeGame();

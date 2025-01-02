@@ -59,6 +59,39 @@
         }
         #audioPlayer {
             display: none;
+
+       .hidden {
+            display: none;
+        }
+
+        #leaderboardSection {
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 8px;
+            width: 100%;
+        }
+
+        #leaderboardTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        #leaderboardTable th,
+        #leaderboardTable td {
+            padding: 0.5rem;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        #leaderboardTable th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+
+        #leaderboardTable tr:hover {
+            background-color: #f0f0f0;
         }
     </style>
 </head>
@@ -83,6 +116,24 @@
 
     <!-- Correct Answers Display -->
     <div id="correctAnswers" role="alert" style="margin-top: 20px; font-weight: bold; color: #28a745;"></div>
+
+    <div id="leaderboardSection" class="hidden">
+            <h2>Top Players</h2>
+            <table id="leaderboardTable">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Player</th>
+                        <th>Songs</th>
+                        <th>Artists</th>
+                        <th>Total</th>
+                        <th>Played</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody">
+                </tbody>
+            </table>
+        </div>
 </div>
 
     <!-- Audio element for playing songs -->

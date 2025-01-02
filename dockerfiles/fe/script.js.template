@@ -13,15 +13,28 @@ const songBackgrounds = {
     song10: 'images/song10-background.jpg'
 };
 
+const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
+const songs = ['song1', 'song2', 'song3', 'song4', 'song5']; // Example list of song files
+const songBackgrounds = {
+    song1: 'images/song1-background.jpg',
+    song2: 'images/song2-background.jpg',
+    song3: 'images/song3-background.jpg',
+    song4: 'images/song4-background.jpg',
+    song5: 'images/song5-background.jpg'
+};
+
 let currentSongIndex = 0;
 let guesses = [];
-let playerName = ''; 
+let playerName = ''; // Captured at the start of the game
 
 const audioElement = document.getElementById('audioPlayer');
 const resultElement = document.getElementById('result');
+const correctAnswersElement = document.getElementById('correctAnswers');
 const playSongBtn = document.getElementById('playSongBtn');
 const submitGuessBtn = document.getElementById('submitGuessBtn');
 const submitAllGuessesBtn = document.getElementById('submitAllGuessesBtn');
+const setPlayerNameBtn = document.getElementById('setPlayerNameBtn');
+const playerNameInput = document.getElementById('playerNameInput');
 const topPlayerElement = document.getElementById('topPlayer');
 
 function updateBackgroundImage(song) {
@@ -63,44 +76,9 @@ function submitGuess() {
         resultElement.innerText = 'Guess submitted! Get ready for the next song.';
 
         submitGuessBtn.disabled = true;
-        setTimeout(playNextSong, 2000);
+        setTimeout(playNextSong, 2000); // Delay before playing the next song
     } else {
-        resultElement.innerText = 'Please enter both a song and artist guess.';
-    }
-}
-
-async function updateLeaderboard() {
-    try {
-        const response = await fetch(`http://${backendUrl}/leaderboard`);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        
-        const leaderboardData = await response.json();
-        const leaderboardBody = document.getElementById('leaderboardBody');
-        leaderboardBody.innerHTML = '';
-        
-        leaderboardData.forEach((player, index) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${index + 1}</td>
-                <td>${player.playerName}</td>
-                <td>${player.correctSongGuesses || 0}</td>
-                <td>${player.correctArtistGuesses || 0}</td>
-                <td>${player.totalScore}</td>
-            `;
-            leaderboardBody.appendChild(row);
-        });
-
-        // Display the top player
-        if (leaderboardData.length > 0) {
-            const topPlayer = leaderboardData[0];
-            topPlayerElement.innerText = `Top Player: ${topPlayer.playerName} with a score of ${topPlayer.totalScore}`;
-        }
-        
-        document.getElementById('leaderboardSection').classList.remove('hidden');
-    } catch (error) {
-        console.error('Error updating leaderboard:', error);
+        resultElement.innerText = 'Please enter both a song and an artist guess.';
     }
 }
 
@@ -109,60 +87,55 @@ async function submitAllGuesses() {
     submitAllGuessesBtn.innerText = 'Submitting...';
 
     try {
-        const response = await fetch(`http://${backendUrl}/submit-guesses`, {
+        const response = await fetch(`${backendUrl}/submit-guesses`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ playerName, guesses })
         });
-        
+
         if (!response.ok) {
             throw new Error('Failed to submit guesses');
         }
-        
+
         const result = await response.json();
+
         const totalCorrectSongGuesses = result.correctSongGuesses || 0;
         const totalCorrectArtistGuesses = result.correctArtistGuesses || 0;
         const correctAnswers = result.correctAnswers || [];
-        
+        const topPlayer = result.topPlayer || { name: 'N/A', score: 0 };
+
         resultElement.innerText = `
             Game Over! You got ${totalCorrectSongGuesses} song(s) and ${totalCorrectArtistGuesses} artist(s) correct.
-            Correct Answers: ${correctAnswers.join(', ')}
         `;
-        
-        await updateLeaderboard();
-        
+        correctAnswersElement.innerText = `Correct Answers: ${correctAnswers.join(', ')}`;
+        topPlayerElement.innerText = `Top Player: ${topPlayer.name} with ${topPlayer.score} correct guesses.`;
+
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
     } catch (error) {
         console.error('Error submitting guesses:', error);
         resultElement.innerText = 'Error: Could not submit your guesses. Please try again.';
         submitAllGuessesBtn.disabled = false;
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
-    } finally {
-        submitAllGuessesBtn.disabled = false;
     }
 }
 
-audioElement.onended = () => {
-    submitGuessBtn.disabled = false;
-};
+setPlayerNameBtn.addEventListener('click', () => {
+    const name = playerNameInput.value.trim();
+    if (name) {
+        playerName = name;
+        resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
+        playSongBtn.disabled = false;
+        setPlayerNameBtn.disabled = true;
+        playerNameInput.disabled = true;
+    } else {
+        resultElement.innerText = 'Please enter a valid name to start.';
+    }
+});
 
 playSongBtn.addEventListener('click', playNextSong);
 submitGuessBtn.addEventListener('click', submitGuess);
 submitAllGuessesBtn.addEventListener('click', submitAllGuesses);
 
-function initializeGame() {
-    playerName = prompt('Enter your name to start the game:');
-    if (!playerName) {
-        resultElement.innerText = 'Please enter a valid name to start.';
-        return;
-    }
-
-    resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
-    playSongBtn.disabled = false;
-    submitGuessBtn.disabled = true;
-    submitAllGuessesBtn.disabled = true;
-    
-    updateLeaderboard();
-}
-
-initializeGame();
+audioElement.onended = () => {
+    submitGuessBtn.disabled = false;
+};

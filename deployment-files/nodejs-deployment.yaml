@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: quay.io/rhn_support_kquinn/middleware-node-js-app-artists-sep-remove:latest
+        image: quay.io/rhn_support_kquinn/middleware-js-artists-sep-remove-leader:latest
         ports:
         - containerPort: 3000
         resources:

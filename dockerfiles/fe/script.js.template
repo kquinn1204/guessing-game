@@ -1,7 +1,5 @@
-// Script.js for Music Game Application
-
 const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
-const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10']; // Updated to match MongoDB
+const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10'];
 const songBackgrounds = {
     song1: 'images/song1-background.jpg',
     song2: 'images/song2-background.jpg',
@@ -19,11 +17,12 @@ let currentSongIndex = 0;
 let guesses = [];
 let playerName = ''; 
 
-const audioElement = document.getElementById('audioPlayer'); // Updated to match HTML
+const audioElement = document.getElementById('audioPlayer');
 const resultElement = document.getElementById('result');
 const playSongBtn = document.getElementById('playSongBtn');
 const submitGuessBtn = document.getElementById('submitGuessBtn');
 const submitAllGuessesBtn = document.getElementById('submitAllGuessesBtn');
+const topPlayerElement = document.getElementById('topPlayer');
 
 function updateBackgroundImage(song) {
     const background = songBackgrounds[song] || 'images/default-background.jpg';
@@ -70,7 +69,6 @@ function submitGuess() {
     }
 }
 
-// Single updateLeaderboard function
 async function updateLeaderboard() {
     try {
         const response = await fetch(`http://${backendUrl}/leaderboard`);
@@ -84,18 +82,21 @@ async function updateLeaderboard() {
         
         leaderboardData.forEach((player, index) => {
             const row = document.createElement('tr');
-            const playedDate = new Date(player.playedAt).toLocaleDateString();
-            
             row.innerHTML = `
                 <td>${index + 1}</td>
                 <td>${player.playerName}</td>
                 <td>${player.correctSongGuesses || 0}</td>
                 <td>${player.correctArtistGuesses || 0}</td>
                 <td>${player.totalScore}</td>
-                <td>${playedDate}</td>
             `;
             leaderboardBody.appendChild(row);
         });
+
+        // Display the top player
+        if (leaderboardData.length > 0) {
+            const topPlayer = leaderboardData[0];
+            topPlayerElement.innerText = `Top Player: ${topPlayer.playerName} with a score of ${topPlayer.totalScore}`;
+        }
         
         document.getElementById('leaderboardSection').classList.remove('hidden');
     } catch (error) {
@@ -149,7 +150,6 @@ playSongBtn.addEventListener('click', playNextSong);
 submitGuessBtn.addEventListener('click', submitGuess);
 submitAllGuessesBtn.addEventListener('click', submitAllGuesses);
 
-// Initialize the game
 function initializeGame() {
     playerName = prompt('Enter your name to start the game:');
     if (!playerName) {
@@ -162,7 +162,6 @@ function initializeGame() {
     submitGuessBtn.disabled = true;
     submitAllGuessesBtn.disabled = true;
     
-    // Load initial leaderboard
     updateLeaderboard();
 }
 

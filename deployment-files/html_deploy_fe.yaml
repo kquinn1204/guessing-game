@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: quay.io/rhn_support_kquinn/fe_revised_artist_sep_remove_song_select:latest
+        image: quay.io/rhn_support_kquinn/fe_sep_remove_song_select_leader:latest
         ports:
         - containerPort: 8080
         volumeMounts:

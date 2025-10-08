@@ -1,7 +1,7 @@
 // Script.js for Music Game Application
 
-const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
-const songs = ['song1', 'song2', 'song3', 'song4', 'song5']; // Example list of song files
+const backendUrl = 'http://${BACKEND_URL}'; // Dynamically set using ConfigMap
+const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10']; // List of all song files
 const songBackgrounds = {
     song1: 'images/song1-background.jpg',
     song2: 'images/song2-background.jpg',
@@ -19,11 +19,14 @@ let currentSongIndex = 0;
 let guesses = [];
 let playerName = ''; // Captured at the start of the game
 
-const audioElement = document.getElementById('audio');
+const audioElement = document.getElementById('audioPlayer');
 const resultElement = document.getElementById('result');
 const playSongBtn = document.getElementById('playSongBtn');
 const submitGuessBtn = document.getElementById('submitGuessBtn');
 const submitAllGuessesBtn = document.getElementById('submitAllGuessesBtn');
+const toggleLeaderboardBtn = document.getElementById('toggleLeaderboard');
+const leaderboardDiv = document.getElementById('leaderboard');
+const leaderboardBody = document.getElementById('leaderboardBody');
 
 function updateBackgroundImage(song) {
     const background = songBackgrounds[song] || 'images/default-background.jpg';
@@ -97,11 +100,75 @@ async function submitAllGuesses() {
         `;
 
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
+
+        // Refresh leaderboard after submitting guesses
+        await fetchLeaderboard();
     } catch (error) {
         console.error('Error submitting guesses:', error);
         resultElement.innerText = 'Error: Could not submit your guesses. Please try again.';
         submitAllGuessesBtn.disabled = false;
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
+    }
+}
+
+async function fetchLeaderboard() {
+    try {
+        const response = await fetch(`${backendUrl}/leaderboard`);
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch leaderboard');
+        }
+
+        const data = await response.json();
+        displayLeaderboard(data.leaderboard || []);
+    } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        leaderboardBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Failed to load leaderboard</td></tr>';
+    }
+}
+
+function displayLeaderboard(leaderboard) {
+    if (leaderboard.length === 0) {
+        leaderboardBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No players yet. Be the first!</td></tr>';
+        return;
+    }
+
+    leaderboardBody.innerHTML = leaderboard.map((player, index) => {
+        const rank = index + 1;
+        let rankClass = '';
+        let rankDisplay = rank;
+
+        if (rank === 1) {
+            rankClass = 'gold';
+            rankDisplay = '🥇';
+        } else if (rank === 2) {
+            rankClass = 'silver';
+            rankDisplay = '🥈';
+        } else if (rank === 3) {
+            rankClass = 'bronze';
+            rankDisplay = '🥉';
+        }
+
+        return `
+            <tr>
+                <td class="rank ${rankClass}">${rankDisplay}</td>
+                <td>${player.playerName}</td>
+                <td><strong>${player.totalCorrect}</strong></td>
+                <td>${player.correctSongs}</td>
+                <td>${player.correctArtists}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function toggleLeaderboard() {
+    if (leaderboardDiv.style.display === 'none') {
+        leaderboardDiv.style.display = 'block';
+        toggleLeaderboardBtn.innerText = 'Hide Leaderboard';
+        fetchLeaderboard();
+    } else {
+        leaderboardDiv.style.display = 'none';
+        toggleLeaderboardBtn.innerText = 'View Leaderboard';
     }
 }
 
@@ -112,19 +179,31 @@ audioElement.onended = () => {
 playSongBtn.addEventListener('click', playNextSong);
 submitGuessBtn.addEventListener('click', submitGuess);
 submitAllGuessesBtn.addEventListener('click', submitAllGuesses);
+toggleLeaderboardBtn.addEventListener('click', toggleLeaderboard);
 
 // Initialize the game
 function initializeGame() {
-    playerName = prompt('Enter your name to start the game:');
-    if (!playerName) {
-        resultElement.innerText = 'Please enter a valid name to start.';
-        return;
-    }
+    const playerNameInput = document.getElementById('playerNameInput');
+    const setPlayerNameBtn = document.getElementById('setPlayerNameBtn');
 
-    resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
-    playSongBtn.disabled = false;
-    submitGuessBtn.disabled = true;
-    submitAllGuessesBtn.disabled = true;
+    setPlayerNameBtn.addEventListener('click', () => {
+        playerName = playerNameInput.value.trim();
+        if (!playerName) {
+            resultElement.innerText = 'Please enter a valid name to start.';
+            return;
+        }
+
+        resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
+        playSongBtn.disabled = false;
+        submitGuessBtn.disabled = true;
+        submitAllGuessesBtn.disabled = true;
+        playerNameInput.disabled = true;
+        setPlayerNameBtn.disabled = true;
+    });
 }
 
-initializeGame();
+// Load leaderboard on page load
+document.addEventListener('DOMContentLoaded', () => {
+    initializeGame();
+    fetchLeaderboard();
+});

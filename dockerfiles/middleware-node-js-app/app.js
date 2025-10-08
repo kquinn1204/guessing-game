@@ -148,6 +148,47 @@ app.post('/submit-guesses', async (req, res) => {
     }
 });
 
+// GET route to retrieve leaderboard
+app.get('/leaderboard', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const playersCollection = db.collection('players');
+
+        // Get top 10 players sorted by total correct guesses (songs + artists)
+        const leaderboard = await playersCollection
+            .find({ playerName: { $ne: 'Test Player' } }) // Exclude test player
+            .project({
+                playerName: 1,
+                correctSongGuesses: 1,
+                correctArtistGuesses: 1,
+                guesses: 1,
+                timestamp: 1
+            })
+            .sort({
+                $expr: {
+                    $add: ['$correctSongGuesses', '$correctArtistGuesses']
+                }
+            })
+            .limit(10)
+            .toArray();
+
+        // Calculate total correct for each player
+        const leaderboardWithTotals = leaderboard.map(player => ({
+            playerName: player.playerName,
+            totalCorrect: (player.correctSongGuesses || 0) + (player.correctArtistGuesses || 0),
+            correctSongs: player.correctSongGuesses || 0,
+            correctArtists: player.correctArtistGuesses || 0,
+            totalGuesses: player.guesses || 0,
+            timestamp: player.timestamp
+        })).sort((a, b) => b.totalCorrect - a.totalCorrect);
+
+        res.status(200).json({ leaderboard: leaderboardWithTotals });
+    } catch (error) {
+        console.error('Error fetching leaderboard:', error);
+        res.status(500).json({ error: 'Failed to fetch leaderboard' });
+    }
+});
+
 // Test route to check MongoDB connectivity
 app.get('/test-db', async (req, res) => {
     try {

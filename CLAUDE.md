@@ -45,8 +45,8 @@ oc create configmap frontend-config -n music-game --from-literal=ALLOWED_ORIGINS
 ### Deploy Storage
 
 ```bash
-oc apply -f pv-files/pvcmongo.yaml               # PV for MongoDB
 oc apply -f pv-files/pvmongo.yaml                # PVC for MongoDB
+oc apply -f pv-files/pvcmongo.yaml               # PV for MongoDB
 ```
 
 ### Deploy Applications
@@ -70,6 +70,7 @@ oc apply -f deployment-files/html_deploy_fe.yaml     # Nginx frontend
 
 2. **Backend (Node.js/Express)**:
    - Provides `/submit-guesses` endpoint to validate player guesses
+   - Provides `/leaderboard` endpoint to retrieve top 10 players
    - Provides `/test-db` endpoint to check MongoDB connectivity
    - Uses MongoDB native driver (not Mongoose, despite being in package.json)
    - Connects to MongoDB via internal service: `mongodb://mongodb-service:27017`
@@ -106,14 +107,17 @@ Each component has a Dockerfile in `dockerfiles/`:
 # Build frontend
 cd dockerfiles/fe
 podman build -t quay.io/rhn_support_kquinn/fe_revised_artist_sep_remove_song_select:latest .
+podman push quay.io/rhn_support_kquinn/fe_revised_artist_sep_remove_song_select:latest
 
 # Build backend
 cd dockerfiles/middleware-node-js-app
 podman build -t quay.io/rhn_support_kquinn/middleware-node-js-app-artists-sep-remove:latest .
+podman push quay.io/rhn_support_kquinn/middleware-node-js-app-artists-sep-remove:latest
 
 # Build database
 cd dockerfiles/be-mongo-db
 podman build -t quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest .
+podman push quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest
 ```
 
 ## Game Logic Flow
@@ -133,6 +137,7 @@ podman build -t quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest .
 4. Backend updates/creates player record in `players` collection
 5. Backend returns score and correct answers to frontend
 6. Scoring: 2 points possible per song (1 for song name, 1 for artist)
+7. Leaderboard displays top 10 players sorted by total correct (songs + artists)
 
 ## Important Notes
 
@@ -140,3 +145,6 @@ podman build -t quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest .
 - **ConfigMap Order**: Routes must exist before creating ConfigMaps (see setup script in `script/scripts.txt`)
 - **Template Files**: Never edit `index.html`, `script.js`, or `nginx.conf` directly - edit `.template` files
 - **Database Initialization**: MongoDB initializes only on first run via `init.js` (uses Docker entrypoint)
+- **Leaderboard**: Excludes test players (playerName: 'Test Player') from results
+- **Connection Pooling**: Backend uses MongoDB connection pooling (maxPoolSize: 10, minPoolSize: 2)
+- **Retry Logic**: Backend retries MongoDB connection up to 5 times with 2-second delays

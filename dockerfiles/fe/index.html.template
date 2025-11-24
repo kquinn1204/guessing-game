@@ -60,6 +60,53 @@
         #audioPlayer {
             display: none;
         }
+        #leaderboard {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        #leaderboard h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        #leaderboard table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        #leaderboard th {
+            background-color: #007bff;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        #leaderboard td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        #leaderboard tr:hover {
+            background-color: #f5f5f5;
+        }
+        #leaderboard .rank {
+            font-weight: bold;
+            color: #007bff;
+            width: 50px;
+        }
+        #leaderboard .gold { color: #FFD700; }
+        #leaderboard .silver { color: #C0C0C0; }
+        #leaderboard .bronze { color: #CD7F32; }
+        #toggleLeaderboard {
+            margin-top: 20px;
+            background-color: #28a745;
+        }
+        #toggleLeaderboard:hover {
+            background-color: #218838;
+        }
     </style>
 </head>
 <body>
@@ -83,6 +130,28 @@
 
     <!-- Correct Answers Display -->
     <div id="correctAnswers" role="alert" style="margin-top: 20px; font-weight: bold; color: #28a745;"></div>
+
+    <!-- Toggle Leaderboard Button -->
+    <button id="toggleLeaderboard" aria-label="View Leaderboard">View Leaderboard</button>
+
+    <!-- Leaderboard Section -->
+    <div id="leaderboard" style="display: none;">
+        <h2>🏆 Top Players</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Player</th>
+                    <th>Total Correct</th>
+                    <th>Songs</th>
+                    <th>Artists</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+                <!-- Leaderboard data will be inserted here -->
+            </tbody>
+        </table>
+    </div>
 </div>
 
     <!-- Audio element for playing songs -->

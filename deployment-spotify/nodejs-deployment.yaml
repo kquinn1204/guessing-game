@@ -58,3 +58,12 @@ spec:
             secretKeyRef:
               name: spotify-credentials
               key: SPOTIFY_REDIRECT_URI
+        - name: AUDIO_UPLOAD_DIR
+          value: '/usr/src/app/uploads/audio'
+        volumeMounts:
+        - name: audio-storage
+          mountPath: /usr/src/app/uploads
+      volumes:
+      - name: audio-storage
+        persistentVolumeClaim:
+          claimName: audio-storage-pvc

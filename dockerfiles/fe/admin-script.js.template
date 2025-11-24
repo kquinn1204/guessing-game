@@ -10,8 +10,12 @@ const authStatus = document.getElementById('authStatus');
 const loginBtn = document.getElementById('loginBtn');
 const logoutBtn = document.getElementById('logoutBtn');
 const welcomeSection = document.getElementById('welcomeSection');
+const navTabs = document.getElementById('navTabs');
+const tabPlaylists = document.getElementById('tabPlaylists');
+const tabManageSongs = document.getElementById('tabManageSongs');
 const playlistsSection = document.getElementById('playlistsSection');
 const tracksSection = document.getElementById('tracksSection');
+const manageSongsSection = document.getElementById('manageSongsSection');
 const playlistsLoading = document.getElementById('playlistsLoading');
 const playlistsGrid = document.getElementById('playlistsGrid');
 const tracksLoading = document.getElementById('tracksLoading');
@@ -21,6 +25,9 @@ const backToPlaylists = document.getElementById('backToPlaylists');
 const importControls = document.getElementById('importControls');
 const importBtn = document.getElementById('importBtn');
 const selectedCount = document.getElementById('selectedCount');
+const songsLoading = document.getElementById('songsLoading');
+const songsTable = document.getElementById('songsTable');
+const songsTableBody = document.getElementById('songsTableBody');
 const errorMessage = document.getElementById('errorMessage');
 const successMessage = document.getElementById('successMessage');
 
@@ -72,7 +79,11 @@ function updateUIForAuthenticatedUser() {
     loginBtn.classList.add('hidden');
     logoutBtn.classList.remove('hidden');
     welcomeSection.classList.add('hidden');
+    navTabs.classList.remove('hidden');
     playlistsSection.classList.remove('hidden');
+
+    // Set up tab navigation
+    setupTabNavigation();
 }
 
 // Update UI for unauthenticated user
@@ -82,8 +93,40 @@ function updateUIForUnauthenticatedUser() {
     loginBtn.classList.remove('hidden');
     logoutBtn.classList.add('hidden');
     welcomeSection.classList.remove('hidden');
+    navTabs.classList.add('hidden');
     playlistsSection.classList.add('hidden');
     tracksSection.classList.add('hidden');
+    manageSongsSection.classList.add('hidden');
+}
+
+// Setup tab navigation
+function setupTabNavigation() {
+    tabPlaylists.addEventListener('click', () => {
+        switchTab('playlists');
+    });
+
+    tabManageSongs.addEventListener('click', () => {
+        switchTab('manageSongs');
+    });
+}
+
+// Switch between tabs
+function switchTab(tab) {
+    // Update tab active states
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+
+    if (tab === 'playlists') {
+        tabPlaylists.classList.add('active');
+        playlistsSection.classList.remove('hidden');
+        tracksSection.classList.add('hidden');
+        manageSongsSection.classList.add('hidden');
+    } else if (tab === 'manageSongs') {
+        tabManageSongs.classList.add('active');
+        playlistsSection.classList.add('hidden');
+        tracksSection.classList.add('hidden');
+        manageSongsSection.classList.remove('hidden');
+        loadSongs();
+    }
 }
 
 // Logout handler
@@ -309,3 +352,153 @@ function showSuccess(message) {
         successMessage.classList.add('hidden');
     }, 5000);
 }
+
+// ========================================
+// SONG MANAGEMENT FUNCTIONS
+// ========================================
+
+// Load all songs from database
+async function loadSongs() {
+    songsLoading.classList.remove('hidden');
+    songsTable.classList.add('hidden');
+    songsTableBody.innerHTML = '';
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/songs`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch songs');
+        }
+
+        const songs = await response.json();
+        songsLoading.classList.add('hidden');
+
+        if (songs.length === 0) {
+            songsTableBody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px;">No songs found. Import some from Spotify first!</td></tr>';
+            songsTable.classList.remove('hidden');
+            return;
+        }
+
+        songs.forEach(song => {
+            const row = createSongRow(song);
+            songsTableBody.appendChild(row);
+        });
+
+        songsTable.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error loading songs:', error);
+        songsLoading.classList.add('hidden');
+        showError('Failed to load songs. Please try again.');
+    }
+}
+
+// Create song table row
+function createSongRow(song) {
+    const row = document.createElement('tr');
+
+    const albumArt = song.album_art_url || 'https://via.placeholder.com/40x40?text=No+Image';
+
+    row.innerHTML = `
+        <td><img src="${albumArt}" alt="${song.song_name}" class="album-art-small"></td>
+        <td>${song.song_name}</td>
+        <td>${song.artist_name}</td>
+        <td>${song.album_name || 'N/A'}</td>
+        <td>
+            <span class="status-badge ${song.has_audio ? 'has-audio' : 'no-audio'}">
+                ${song.has_audio ? '✓ Has Audio' : '⚠ No Audio'}
+            </span>
+        </td>
+        <td>
+            ${song.has_audio ?
+                `<button class="btn btn-secondary btn-small" onclick="replaceAudio('${song._id}')">Replace Audio</button>` :
+                `<button class="btn btn-primary btn-small" onclick="uploadAudioForSong('${song._id}')">Upload Audio</button>`
+            }
+            <button class="btn btn-danger btn-small" onclick="deleteSong('${song._id}')">Delete</button>
+        </td>
+    `;
+
+    return row;
+}
+
+// Upload audio for a song
+window.uploadAudioForSong = async function(songId) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'audio/mp3,audio/mpeg';
+
+    input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.match('audio/(mp3|mpeg)') && !file.name.endsWith('.mp3')) {
+            showError('Please select an MP3 file');
+            return;
+        }
+
+        // Validate file size (10MB max)
+        if (file.size > 10 * 1024 * 1024) {
+            showError('File size must be less than 10MB');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('audioFile', file);
+        formData.append('songId', songId);
+
+        try {
+            showSuccess('Uploading audio file...');
+
+            const response = await fetch(`${BACKEND_URL}/api/admin/upload-audio/${songId}`, {
+                method: 'POST',
+                credentials: 'include',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Upload failed');
+            }
+
+            const result = await response.json();
+            showSuccess('Audio file uploaded successfully!');
+
+            // Reload songs table
+            await loadSongs();
+        } catch (error) {
+            console.error('Error uploading audio:', error);
+            showError(`Failed to upload audio: ${error.message}`);
+        }
+    };
+
+    input.click();
+};
+
+// Replace audio for a song (same as upload)
+window.replaceAudio = window.uploadAudioForSong;
+
+// Delete a song
+window.deleteSong = async function(songId) {
+    if (!confirm('Are you sure you want to delete this song? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/songs/${songId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to delete song');
+        }
+
+        showSuccess('Song deleted successfully');
+        await loadSongs();
+    } catch (error) {
+        console.error('Error deleting song:', error);
+        showError('Failed to delete song. Please try again.');
+    }
+};

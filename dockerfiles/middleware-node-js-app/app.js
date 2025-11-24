@@ -3,6 +3,40 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
 
+// Simple Levenshtein distance function for fuzzy matching
+function levenshteinDistance(str1, str2) {
+    const m = str1.length;
+    const n = str2.length;
+    const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
+
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (str1[i - 1] === str2[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1];
+            } else {
+                dp[i][j] = Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]) + 1;
+            }
+        }
+    }
+    return dp[m][n];
+}
+
+// Fuzzy match function - allows up to 2 character differences for strings > 5 chars
+function fuzzyMatch(guess, actual) {
+    const guessLower = guess.toLowerCase().trim();
+    const actualLower = actual.toLowerCase().trim();
+
+    if (guessLower === actualLower) return true;
+
+    const maxDistance = actualLower.length > 5 ? 2 : 1;
+    const distance = levenshteinDistance(guessLower, actualLower);
+
+    return distance <= maxDistance;
+}
+
 // Create an Express application
 const app = express();
 const port = process.env.PORT || 3000;
@@ -99,8 +133,8 @@ app.post('/submit-guesses', async (req, res) => {
                 continue;
             }
 
-            const isSongCorrect = song.song_name.toLowerCase() === songGuess.toLowerCase();
-            const isArtistCorrect = song.artist_name.toLowerCase() === artistGuess.toLowerCase();
+            const isSongCorrect = fuzzyMatch(songGuess, song.song_name);
+            const isArtistCorrect = fuzzyMatch(artistGuess, song.artist_name);
 
             if (isSongCorrect) correctSongCount++;
             if (isArtistCorrect) correctArtistCount++;
@@ -146,6 +180,39 @@ app.post('/submit-guesses', async (req, res) => {
     }
 });
 
+// POST route for immediate guess validation (optional feature)
+app.post('/validate-guess', async (req, res) => {
+    const { songFile, songGuess, artistGuess } = req.body;
+
+    if (!songFile || !songGuess || !artistGuess) {
+        return res.status(400).json({ error: 'Invalid input' });
+    }
+
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+
+        const mp3_filename = `${songFile}.mp3`;
+        const song = await songsCollection.findOne({ mp3_filename });
+
+        if (!song) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        const isSongCorrect = fuzzyMatch(songGuess, song.song_name);
+        const isArtistCorrect = fuzzyMatch(artistGuess, song.artist_name);
+
+        res.json({
+            correctSong: isSongCorrect,
+            correctArtist: isArtistCorrect,
+            correctAnswer: { song: song.song_name, artist: song.artist_name }
+        });
+    } catch (error) {
+        console.error('Error validating guess:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // Test route to check MongoDB connectivity
 app.get('/test-db', async (req, res) => {
     try {
@@ -158,14 +225,29 @@ app.get('/test-db', async (req, res) => {
     }
 });
 
-// Leaderboard route
+// Leaderboard route with time filtering
 app.get('/leaderboard', async (req, res) => {
     try {
         await connectToDatabase();
         const playersCollection = db.collection('players');
 
+        const filter = req.query.filter || 'all';
+        let dateFilter = {};
+
+        const now = new Date();
+        if (filter === 'daily') {
+            // Today's records only
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            dateFilter = { timestamp: { $gte: startOfDay } };
+        } else if (filter === 'weekly') {
+            // Last 7 days
+            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+            dateFilter = { timestamp: { $gte: weekAgo } };
+        }
+        // 'all' or any other value = no date filter
+
         const leaderboard = await playersCollection
-            .find({})
+            .find(dateFilter)
             .project({
                 playerName: 1,
                 correctSongGuesses: 1,

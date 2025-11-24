@@ -28,7 +28,7 @@
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             width: 90%;
-            max-width: 500px;
+            max-width: 600px;
         }
         input[type="text"], button {
             width: 100%;
@@ -52,6 +52,18 @@
             background-color: #cccccc;
             cursor: not-allowed;
         }
+        .button-secondary {
+            background-color: #6c757d;
+        }
+        .button-secondary:hover {
+            background-color: #5a6268;
+        }
+        .button-success {
+            background-color: #28a745;
+        }
+        .button-success:hover {
+            background-color: #218838;
+        }
         #result {
             margin-top: 20px;
             font-size: 1rem;
@@ -60,6 +72,91 @@
         #audioPlayer {
             display: none;
         }
+        #progressIndicator {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 15px 0;
+            color: #007bff;
+        }
+        .audio-controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .audio-controls button {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        .progress-bar-container {
+            width: 100%;
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background-color: #007bff;
+            width: 0%;
+            transition: width 0.1s;
+        }
+        .feedback {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .feedback-correct {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .feedback-incorrect {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .leaderboard-filters {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+        .leaderboard-filters button {
+            width: auto;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+        }
+        .filter-active {
+            background-color: #0056b3;
+        }
+        #leaderboardSection {
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .leaderboard-entry {
+            padding: 8px;
+            margin: 5px 0;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .leaderboard-entry:nth-child(1) {
+            background-color: #ffd700;
+            font-weight: bold;
+        }
+        .leaderboard-entry:nth-child(2) {
+            background-color: #c0c0c0;
+        }
+        .leaderboard-entry:nth-child(3) {
+            background-color: #cd7f32;
+        }
     </style>
 </head>
 <body>
@@ -67,10 +164,21 @@
         <h1>Music Game</h1>
         <p>Guess the song and artist based on the audio clip!</p>
 
+        <div id="progressIndicator" style="display:none;"></div>
+
         <input type="text" id="playerNameInput" placeholder="Enter your name" aria-label="Player Name">
         <button id="setPlayerNameBtn" aria-label="Set your player name">Set Name</button>
 
         <button id="playSongBtn" aria-label="Play the next song" disabled>Play Song</button>
+
+        <div class="audio-controls" id="audioControls" style="display:none;">
+            <button id="playPauseBtn" class="button-secondary" aria-label="Play or Pause">Play</button>
+            <button id="replayBtn" class="button-secondary" aria-label="Replay Song">Replay</button>
+        </div>
+
+        <div class="progress-bar-container" id="progressBarContainer" style="display:none;">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
 
         <input type="text" id="songGuessInput" placeholder="Enter your song guess" aria-label="Song Guess">
         <input type="text" id="artistGuessInput" placeholder="Enter your artist guess" aria-label="Artist Guess">
@@ -78,8 +186,22 @@
         <button id="submitGuessBtn" aria-label="Submit your guess" disabled>Submit Guess</button>
         <button id="submitAllGuessesBtn" aria-label="Submit all guesses" disabled>Submit All Guesses</button>
 
+        <div id="songFeedback"></div>
         <div id="result" role="alert"></div>
         <div id="correctAnswers" role="alert"></div>
+
+        <button id="playAgainBtn" class="button-success" aria-label="Play Again" style="display:none;">Play Again</button>
+
+        <div id="leaderboardSection" style="display:none;">
+            <h3>Leaderboard</h3>
+            <div class="leaderboard-filters">
+                <button id="filterAllTime" class="filter-active">All Time</button>
+                <button id="filterWeekly">This Week</button>
+                <button id="filterDaily">Today</button>
+            </div>
+            <div id="leaderboardList"></div>
+        </div>
+
         <div id="topPlayer" role="alert"></div>
     </div>
 

@@ -1,4 +1,4 @@
-const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
+const backendUrl = 'http://${BACKEND_URL}'; // Dynamically set using ConfigMap
 const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10'];
 const songBackgrounds = {
     song1: 'images/song1-background.jpg',
@@ -13,20 +13,12 @@ const songBackgrounds = {
     song10: 'images/song10-background.jpg'
 };
 
-const backendUrl = BACKEND_URL; // Dynamically set using ConfigMap
-const songs = ['song1', 'song2', 'song3', 'song4', 'song5']; // Example list of song files
-const songBackgrounds = {
-    song1: 'images/song1-background.jpg',
-    song2: 'images/song2-background.jpg',
-    song3: 'images/song3-background.jpg',
-    song4: 'images/song4-background.jpg',
-    song5: 'images/song5-background.jpg'
-};
-
 let currentSongIndex = 0;
 let guesses = [];
-let playerName = ''; // Captured at the start of the game
+let playerName = '';
+let currentLeaderboardFilter = 'all';
 
+// DOM elements
 const audioElement = document.getElementById('audioPlayer');
 const resultElement = document.getElementById('result');
 const correctAnswersElement = document.getElementById('correctAnswers');
@@ -36,10 +28,42 @@ const submitAllGuessesBtn = document.getElementById('submitAllGuessesBtn');
 const setPlayerNameBtn = document.getElementById('setPlayerNameBtn');
 const playerNameInput = document.getElementById('playerNameInput');
 const topPlayerElement = document.getElementById('topPlayer');
+const progressIndicator = document.getElementById('progressIndicator');
+const audioControls = document.getElementById('audioControls');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const replayBtn = document.getElementById('replayBtn');
+const progressBarContainer = document.getElementById('progressBarContainer');
+const progressBar = document.getElementById('progressBar');
+const songFeedback = document.getElementById('songFeedback');
+const playAgainBtn = document.getElementById('playAgainBtn');
+const leaderboardSection = document.getElementById('leaderboardSection');
+const leaderboardList = document.getElementById('leaderboardList');
+const filterAllTime = document.getElementById('filterAllTime');
+const filterWeekly = document.getElementById('filterWeekly');
+const filterDaily = document.getElementById('filterDaily');
+
+// Load player name from localStorage
+window.addEventListener('DOMContentLoaded', () => {
+    const savedName = localStorage.getItem('playerName');
+    if (savedName) {
+        playerNameInput.value = savedName;
+    }
+});
 
 function updateBackgroundImage(song) {
     const background = songBackgrounds[song] || 'images/default-background.jpg';
     document.body.style.backgroundImage = `url(${background})`;
+}
+
+function updateProgressIndicator() {
+    progressIndicator.style.display = 'block';
+    progressIndicator.innerText = `Song ${currentSongIndex + 1} of ${songs.length}`;
+}
+
+function updateProgressBar() {
+    if (!audioElement.duration) return;
+    const percent = (audioElement.currentTime / audioElement.duration) * 100;
+    progressBar.style.width = percent + '%';
 }
 
 function playNextSong() {
@@ -48,38 +72,92 @@ function playNextSong() {
         audioElement.src = `/audio/${currentSong}.mp3`;
         audioElement.play();
         updateBackgroundImage(currentSong);
+        updateProgressIndicator();
+
+        // Show audio controls and progress bar
+        audioControls.style.display = 'flex';
+        progressBarContainer.style.display = 'block';
+        playPauseBtn.innerText = 'Pause';
 
         resultElement.innerText = `Playing: ${currentSong}`;
         currentSongIndex++;
         playSongBtn.disabled = true;
         submitGuessBtn.disabled = false;
+        songFeedback.innerHTML = ''; // Clear previous feedback
     } else {
         resultElement.innerText = 'All songs have been played. Submit your guesses for the final results.';
         playSongBtn.disabled = true;
         submitAllGuessesBtn.disabled = false;
+        audioControls.style.display = 'none';
+        progressBarContainer.style.display = 'none';
     }
 }
 
-function submitGuess() {
+async function submitGuess() {
     const songGuessInput = document.getElementById('songGuessInput');
     const artistGuessInput = document.getElementById('artistGuessInput');
 
     if (songGuessInput.value.trim() && artistGuessInput.value.trim()) {
+        const songFile = songs[currentSongIndex - 1];
+        const songGuess = songGuessInput.value.trim();
+        const artistGuess = artistGuessInput.value.trim();
+
         guesses.push({
-            songFile: songs[currentSongIndex - 1],
-            songGuess: songGuessInput.value.trim(),
-            artistGuess: artistGuessInput.value.trim()
+            songFile: songFile,
+            songGuess: songGuess,
+            artistGuess: artistGuess
         });
+
+        // Optional: Get immediate feedback
+        try {
+            const response = await fetch(`${backendUrl}/validate-guess`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ songFile, songGuess, artistGuess })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                showImmediateFeedback(result);
+            }
+        } catch (error) {
+            console.log('Immediate feedback not available, continuing...');
+        }
 
         songGuessInput.value = '';
         artistGuessInput.value = '';
         resultElement.innerText = 'Guess submitted! Get ready for the next song.';
 
         submitGuessBtn.disabled = true;
-        setTimeout(playNextSong, 2000); // Delay before playing the next song
+
+        // Stop audio and hide controls
+        audioElement.pause();
+        audioControls.style.display = 'none';
+        progressBarContainer.style.display = 'none';
+
+        setTimeout(playNextSong, 2000);
     } else {
         resultElement.innerText = 'Please enter both a song and an artist guess.';
     }
+}
+
+function showImmediateFeedback(result) {
+    const { correctSong, correctArtist, correctAnswer } = result;
+    let feedbackHTML = '<div class="feedback ';
+
+    if (correctSong && correctArtist) {
+        feedbackHTML += 'feedback-correct">Perfect! Both correct!</div>';
+    } else if (correctSong || correctArtist) {
+        feedbackHTML += 'feedback-incorrect">';
+        feedbackHTML += correctSong ? 'Song correct! ' : 'Song incorrect. ';
+        feedbackHTML += correctArtist ? 'Artist correct!' : 'Artist incorrect.';
+        feedbackHTML += `<br>Answer: ${correctAnswer.song} by ${correctAnswer.artist}</div>`;
+    } else {
+        feedbackHTML += 'feedback-incorrect">Both incorrect.<br>Answer: ';
+        feedbackHTML += `${correctAnswer.song} by ${correctAnswer.artist}</div>`;
+    }
+
+    songFeedback.innerHTML = feedbackHTML;
 }
 
 async function submitAllGuesses() {
@@ -102,13 +180,22 @@ async function submitAllGuesses() {
         const totalCorrectSongGuesses = result.correctSongGuesses || 0;
         const totalCorrectArtistGuesses = result.correctArtistGuesses || 0;
         const correctAnswers = result.correctAnswers || [];
-        const topPlayer = result.topPlayer || { name: 'N/A', score: 0 };
 
-        resultElement.innerText = `
-            Game Over! You got ${totalCorrectSongGuesses} song(s) and ${totalCorrectArtistGuesses} artist(s) correct.
+        resultElement.innerHTML = `
+            <h2>Game Over!</h2>
+            <p>You got ${totalCorrectSongGuesses} song(s) and ${totalCorrectArtistGuesses} artist(s) correct.</p>
+            <p><strong>Total Score: ${totalCorrectSongGuesses + totalCorrectArtistGuesses} out of ${songs.length * 2}</strong></p>
         `;
-        correctAnswersElement.innerText = `Correct Answers: ${correctAnswers.join(', ')}`;
-        topPlayerElement.innerText = `Top Player: ${topPlayer.name} with ${topPlayer.score} correct guesses.`;
+
+        correctAnswersElement.innerHTML = '<h3>Correct Answers:</h3>' +
+            correctAnswers.map(ans => `<p>${ans}</p>`).join('');
+
+        // Show play again button and leaderboard
+        playAgainBtn.style.display = 'block';
+        leaderboardSection.style.display = 'block';
+
+        // Load leaderboard
+        await loadLeaderboard('all');
 
         submitAllGuessesBtn.innerText = 'Submit All Guesses';
     } catch (error) {
@@ -119,10 +206,67 @@ async function submitAllGuesses() {
     }
 }
 
+async function loadLeaderboard(filter) {
+    try {
+        const response = await fetch(`${backendUrl}/leaderboard?filter=${filter}`);
+        if (!response.ok) throw new Error('Failed to load leaderboard');
+
+        const leaderboard = await response.json();
+        displayLeaderboard(leaderboard);
+    } catch (error) {
+        console.error('Error loading leaderboard:', error);
+        leaderboardList.innerHTML = '<p>Error loading leaderboard</p>';
+    }
+}
+
+function displayLeaderboard(leaderboard) {
+    if (!leaderboard || leaderboard.length === 0) {
+        leaderboardList.innerHTML = '<p>No players yet. Be the first!</p>';
+        return;
+    }
+
+    leaderboardList.innerHTML = leaderboard.map((player, index) => `
+        <div class="leaderboard-entry">
+            <span>${index + 1}. ${player.playerName}</span>
+            <span>${player.totalScore} points</span>
+        </div>
+    `).join('');
+}
+
+function resetGame() {
+    currentSongIndex = 0;
+    guesses = [];
+
+    // Reset UI
+    resultElement.innerHTML = '';
+    correctAnswersElement.innerHTML = '';
+    songFeedback.innerHTML = '';
+    progressIndicator.style.display = 'none';
+    audioControls.style.display = 'none';
+    progressBarContainer.style.display = 'none';
+    playAgainBtn.style.display = 'none';
+    leaderboardSection.style.display = 'none';
+
+    // Reset buttons
+    playSongBtn.disabled = false;
+    submitGuessBtn.disabled = true;
+    submitAllGuessesBtn.disabled = true;
+
+    // Clear inputs
+    document.getElementById('songGuessInput').value = '';
+    document.getElementById('artistGuessInput').value = '';
+
+    resultElement.innerText = `Welcome back, ${playerName}! Click "Play Song" to start.`;
+}
+
+// Event Listeners
 setPlayerNameBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim();
     if (name) {
         playerName = name;
+        // Save to localStorage
+        localStorage.setItem('playerName', name);
+
         resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
         playSongBtn.disabled = false;
         setPlayerNameBtn.disabled = true;
@@ -135,7 +279,66 @@ setPlayerNameBtn.addEventListener('click', () => {
 playSongBtn.addEventListener('click', playNextSong);
 submitGuessBtn.addEventListener('click', submitGuess);
 submitAllGuessesBtn.addEventListener('click', submitAllGuesses);
+playAgainBtn.addEventListener('click', resetGame);
 
-audioElement.onended = () => {
+// Audio control event listeners
+playPauseBtn.addEventListener('click', () => {
+    if (audioElement.paused) {
+        audioElement.play();
+        playPauseBtn.innerText = 'Pause';
+    } else {
+        audioElement.pause();
+        playPauseBtn.innerText = 'Play';
+    }
+});
+
+replayBtn.addEventListener('click', () => {
+    audioElement.currentTime = 0;
+    audioElement.play();
+    playPauseBtn.innerText = 'Pause';
+});
+
+// Update progress bar
+audioElement.addEventListener('timeupdate', updateProgressBar);
+
+audioElement.addEventListener('ended', () => {
     submitGuessBtn.disabled = false;
-};
+    playPauseBtn.innerText = 'Play';
+});
+
+// Leaderboard filter event listeners
+filterAllTime.addEventListener('click', () => {
+    currentLeaderboardFilter = 'all';
+    loadLeaderboard('all');
+    updateFilterButtons();
+});
+
+filterWeekly.addEventListener('click', () => {
+    currentLeaderboardFilter = 'weekly';
+    loadLeaderboard('weekly');
+    updateFilterButtons();
+});
+
+filterDaily.addEventListener('click', () => {
+    currentLeaderboardFilter = 'daily';
+    loadLeaderboard('daily');
+    updateFilterButtons();
+});
+
+function updateFilterButtons() {
+    filterAllTime.classList.remove('filter-active');
+    filterWeekly.classList.remove('filter-active');
+    filterDaily.classList.remove('filter-active');
+
+    switch(currentLeaderboardFilter) {
+        case 'all':
+            filterAllTime.classList.add('filter-active');
+            break;
+        case 'weekly':
+            filterWeekly.classList.add('filter-active');
+            break;
+        case 'daily':
+            filterDaily.classList.add('filter-active');
+            break;
+    }
+}

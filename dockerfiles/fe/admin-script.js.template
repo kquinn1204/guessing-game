@@ -1,0 +1,311 @@
+// Backend URL (will be replaced by envsubst)
+const BACKEND_URL = '${BACKEND_URL}';
+
+// State management
+let currentPlaylistId = null;
+let selectedTracks = new Set();
+
+// DOM elements
+const authStatus = document.getElementById('authStatus');
+const loginBtn = document.getElementById('loginBtn');
+const logoutBtn = document.getElementById('logoutBtn');
+const welcomeSection = document.getElementById('welcomeSection');
+const playlistsSection = document.getElementById('playlistsSection');
+const tracksSection = document.getElementById('tracksSection');
+const playlistsLoading = document.getElementById('playlistsLoading');
+const playlistsGrid = document.getElementById('playlistsGrid');
+const tracksLoading = document.getElementById('tracksLoading');
+const tracksList = document.getElementById('tracksList');
+const playlistTitle = document.getElementById('playlistTitle');
+const backToPlaylists = document.getElementById('backToPlaylists');
+const importControls = document.getElementById('importControls');
+const importBtn = document.getElementById('importBtn');
+const selectedCount = document.getElementById('selectedCount');
+const errorMessage = document.getElementById('errorMessage');
+const successMessage = document.getElementById('successMessage');
+
+// Initialize on page load
+window.addEventListener('DOMContentLoaded', async () => {
+    // Check URL parameters for auth status
+    const urlParams = new URLSearchParams(window.location.search);
+    const authParam = urlParams.get('auth');
+    const errorParam = urlParams.get('error');
+
+    if (authParam === 'success') {
+        showSuccess('Successfully authenticated with Spotify!');
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (errorParam) {
+        showError(`Authentication error: ${errorParam}`);
+        // Clean up URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Check authentication status
+    await checkAuthStatus();
+});
+
+// Check if user is authenticated
+async function checkAuthStatus() {
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/auth-status`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+
+        if (data.authenticated) {
+            updateUIForAuthenticatedUser();
+            await loadPlaylists();
+        } else {
+            updateUIForUnauthenticatedUser();
+        }
+    } catch (error) {
+        console.error('Error checking auth status:', error);
+        updateUIForUnauthenticatedUser();
+    }
+}
+
+// Update UI for authenticated user
+function updateUIForAuthenticatedUser() {
+    authStatus.textContent = 'Authenticated';
+    authStatus.className = 'auth-status authenticated';
+    loginBtn.classList.add('hidden');
+    logoutBtn.classList.remove('hidden');
+    welcomeSection.classList.add('hidden');
+    playlistsSection.classList.remove('hidden');
+}
+
+// Update UI for unauthenticated user
+function updateUIForUnauthenticatedUser() {
+    authStatus.textContent = 'Not Authenticated';
+    authStatus.className = 'auth-status not-authenticated';
+    loginBtn.classList.remove('hidden');
+    logoutBtn.classList.add('hidden');
+    welcomeSection.classList.remove('hidden');
+    playlistsSection.classList.add('hidden');
+    tracksSection.classList.add('hidden');
+}
+
+// Logout handler
+logoutBtn.addEventListener('click', async () => {
+    try {
+        await fetch(`${BACKEND_URL}/api/admin/spotify/logout`, {
+            credentials: 'include'
+        });
+        updateUIForUnauthenticatedUser();
+        showSuccess('Logged out successfully');
+    } catch (error) {
+        console.error('Error logging out:', error);
+        showError('Failed to logout');
+    }
+});
+
+// Load user's Spotify playlists
+async function loadPlaylists() {
+    playlistsLoading.classList.remove('hidden');
+    playlistsGrid.innerHTML = '';
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/spotify/playlists`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch playlists');
+        }
+
+        const playlists = await response.json();
+        playlistsLoading.classList.add('hidden');
+
+        if (playlists.length === 0) {
+            playlistsGrid.innerHTML = '<p>No playlists found. Create some playlists in Spotify first!</p>';
+            return;
+        }
+
+        playlists.forEach(playlist => {
+            const card = createPlaylistCard(playlist);
+            playlistsGrid.appendChild(card);
+        });
+    } catch (error) {
+        console.error('Error loading playlists:', error);
+        playlistsLoading.classList.add('hidden');
+        showError('Failed to load playlists. Please try again.');
+    }
+}
+
+// Create playlist card element
+function createPlaylistCard(playlist) {
+    const card = document.createElement('div');
+    card.className = 'playlist-card';
+    card.onclick = () => loadPlaylistTracks(playlist.id, playlist.name);
+
+    const imageUrl = playlist.images && playlist.images.length > 0
+        ? playlist.images[0].url
+        : 'https://via.placeholder.com/250x250?text=No+Image';
+
+    card.innerHTML = `
+        <img src="${imageUrl}" alt="${playlist.name}">
+        <h3>${playlist.name}</h3>
+        <p>${playlist.tracks.total} tracks • ${playlist.owner}</p>
+    `;
+
+    return card;
+}
+
+// Load tracks from a playlist
+async function loadPlaylistTracks(playlistId, playlistName) {
+    currentPlaylistId = playlistId;
+    selectedTracks.clear();
+
+    playlistsSection.classList.add('hidden');
+    tracksSection.classList.remove('hidden');
+    tracksLoading.classList.remove('hidden');
+    tracksList.innerHTML = '';
+    playlistTitle.textContent = playlistName;
+    importControls.classList.add('hidden');
+    updateSelectedCount();
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/spotify/playlist/${playlistId}/tracks`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch tracks');
+        }
+
+        const tracks = await response.json();
+        tracksLoading.classList.add('hidden');
+
+        if (tracks.length === 0) {
+            tracksList.innerHTML = '<p>No tracks found in this playlist.</p>';
+            return;
+        }
+
+        tracks.forEach(track => {
+            const item = createTrackItem(track);
+            tracksList.appendChild(item);
+        });
+
+        importControls.classList.remove('hidden');
+    } catch (error) {
+        console.error('Error loading tracks:', error);
+        tracksLoading.classList.add('hidden');
+        showError('Failed to load tracks. Please try again.');
+    }
+}
+
+// Create track item element
+function createTrackItem(track) {
+    const item = document.createElement('div');
+    item.className = 'track-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.id = `track-${track.id}`;
+    checkbox.onchange = (e) => handleTrackSelection(e, track);
+
+    const imageUrl = track.albumArt || 'https://via.placeholder.com/60x60?text=No+Image';
+
+    item.innerHTML = `
+        <img src="${imageUrl}" alt="${track.name}">
+        <div class="track-info">
+            <h4>${track.name}</h4>
+            <p>${track.artist} • ${track.album}</p>
+        </div>
+    `;
+
+    item.insertBefore(checkbox, item.firstChild);
+
+    return item;
+}
+
+// Handle track selection
+function handleTrackSelection(event, track) {
+    if (event.target.checked) {
+        if (selectedTracks.size >= 10) {
+            event.target.checked = false;
+            showError('You can only select up to 10 tracks at a time.');
+            return;
+        }
+        selectedTracks.add(track);
+    } else {
+        selectedTracks.delete(track);
+    }
+    updateSelectedCount();
+}
+
+// Update selected count display
+function updateSelectedCount() {
+    selectedCount.textContent = selectedTracks.size;
+}
+
+// Back to playlists
+backToPlaylists.addEventListener('click', (e) => {
+    e.preventDefault();
+    tracksSection.classList.add('hidden');
+    playlistsSection.classList.remove('hidden');
+    selectedTracks.clear();
+});
+
+// Import selected tracks
+importBtn.addEventListener('click', async () => {
+    if (selectedTracks.size === 0) {
+        showError('Please select at least one track to import.');
+        return;
+    }
+
+    importBtn.disabled = true;
+    importBtn.textContent = 'Importing...';
+
+    try {
+        const tracks = Array.from(selectedTracks);
+        const response = await fetch(`${BACKEND_URL}/api/admin/spotify/import-playlist`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({ tracks })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to import tracks');
+        }
+
+        const result = await response.json();
+        showSuccess(`Successfully imported ${result.songs.length} songs! You can now upload audio files for them.`);
+
+        // Reset selection
+        selectedTracks.clear();
+        tracksList.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+        updateSelectedCount();
+
+    } catch (error) {
+        console.error('Error importing tracks:', error);
+        showError('Failed to import tracks. Please try again.');
+    } finally {
+        importBtn.disabled = false;
+        importBtn.textContent = 'Import Selected Songs';
+    }
+});
+
+// Show error message
+function showError(message) {
+    errorMessage.textContent = message;
+    errorMessage.classList.remove('hidden');
+    successMessage.classList.add('hidden');
+    setTimeout(() => {
+        errorMessage.classList.add('hidden');
+    }, 5000);
+}
+
+// Show success message
+function showSuccess(message) {
+    successMessage.textContent = message;
+    successMessage.classList.remove('hidden');
+    errorMessage.classList.add('hidden');
+    setTimeout(() => {
+        successMessage.classList.add('hidden');
+    }, 5000);
+}

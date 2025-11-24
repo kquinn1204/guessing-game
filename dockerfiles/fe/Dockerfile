@@ -10,6 +10,8 @@ COPY nginx.conf.template /etc/nginx/nginx.conf.template
 # Copy the HTML template, JavaScript, and music clips into the container
 COPY index.html.template /usr/share/nginx/html/index.html.template
 COPY script.js.template /usr/share/nginx/html/script.js.template
+COPY admin.html.template /usr/share/nginx/html/admin.html.template
+COPY admin-script.js.template /usr/share/nginx/html/admin-script.js.template
 COPY *.mp3 /usr/share/nginx/html/audio/
 
 # Copy the images folder into the container
@@ -27,8 +29,10 @@ USER nginx
 # Expose port 8080 for HTTP traffic
 EXPOSE 8080
 
-# Use envsubst to replace placeholders in both nginx.conf, index.html, and script.js with actual BACKEND_URL
+# Use envsubst to replace placeholders in nginx.conf, HTML, and JS files with actual BACKEND_URL
 CMD ["sh", "-c", "envsubst '${BACKEND_URL}' < /usr/share/nginx/html/index.html.template > /usr/share/nginx/html/index.html && \
     envsubst '${BACKEND_URL}' < /usr/share/nginx/html/script.js.template > /usr/share/nginx/html/script.js && \
+    envsubst '${BACKEND_URL}' < /usr/share/nginx/html/admin.html.template > /usr/share/nginx/html/admin.html && \
+    envsubst '${BACKEND_URL}' < /usr/share/nginx/html/admin-script.js.template > /usr/share/nginx/html/admin-script.js && \
     envsubst '${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /etc/nginx/nginx.conf && \
     nginx -g 'daemon off;'"]

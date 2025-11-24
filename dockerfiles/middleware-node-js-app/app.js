@@ -2,6 +2,8 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const { MongoClient } = require('mongodb');
+const SpotifyWebApi = require('spotify-web-api-node');
+const session = require('express-session');
 
 // Simple Levenshtein distance function for fuzzy matching
 function levenshteinDistance(str1, str2) {
@@ -41,6 +43,18 @@ function fuzzyMatch(guess, actual) {
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Session middleware for admin authentication
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'music-game-admin-secret-key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000 // 24 hours
+    }
+}));
+
 // Middleware to parse incoming JSON requests
 app.use(bodyParser.json());
 
@@ -48,8 +62,24 @@ app.use(bodyParser.json());
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type'],
+    credentials: true
 }));
+
+// Spotify API configuration
+const spotifyApi = new SpotifyWebApi({
+    clientId: process.env.SPOTIFY_CLIENT_ID,
+    clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
+    redirectUri: process.env.SPOTIFY_REDIRECT_URI
+});
+
+// Spotify OAuth scopes
+const scopes = [
+    'user-read-private',
+    'user-read-email',
+    'playlist-read-private',
+    'playlist-read-collaborative'
+];
 
 // MongoDB connection URL and database name
 const mongoUrl = process.env.MONGO_URL || 'mongodb://mongodb-service:27017';
@@ -86,6 +116,268 @@ async function connectToDatabase(retries = 5, delay = 2000) {
     }
     throw new Error('Database connection failed after multiple attempts');
 }
+
+// ========================================
+// SPOTIFY ADMIN ENDPOINTS
+// ========================================
+
+// Middleware to check if admin is authenticated
+function requireAuth(req, res, next) {
+    if (!req.session.spotifyAccessToken) {
+        return res.status(401).json({ error: 'Not authenticated. Please login with Spotify.' });
+    }
+    next();
+}
+
+// Spotify OAuth login endpoint
+app.get('/api/admin/spotify/login', (req, res) => {
+    const authorizeURL = spotifyApi.createAuthorizeURL(scopes, 'state-key');
+    console.log('Redirecting to Spotify OAuth:', authorizeURL);
+    res.redirect(authorizeURL);
+});
+
+// Spotify OAuth callback endpoint
+app.get('/api/admin/spotify/callback', async (req, res) => {
+    const { code, error } = req.query;
+
+    if (error) {
+        console.error('Spotify OAuth error:', error);
+        return res.redirect('/admin?error=spotify_auth_failed');
+    }
+
+    if (!code) {
+        return res.redirect('/admin?error=no_code');
+    }
+
+    try {
+        // Exchange authorization code for access token
+        const data = await spotifyApi.authorizationCodeGrant(code);
+        const { access_token, refresh_token, expires_in } = data.body;
+
+        // Store tokens in session
+        req.session.spotifyAccessToken = access_token;
+        req.session.spotifyRefreshToken = refresh_token;
+        req.session.spotifyTokenExpiry = Date.now() + expires_in * 1000;
+
+        // Set access token on the API object
+        spotifyApi.setAccessToken(access_token);
+        spotifyApi.setRefreshToken(refresh_token);
+
+        console.log('Spotify OAuth successful');
+
+        // Redirect to admin panel
+        res.redirect('/admin?auth=success');
+    } catch (error) {
+        console.error('Error exchanging code for token:', error);
+        res.redirect('/admin?error=token_exchange_failed');
+    }
+});
+
+// Logout endpoint
+app.get('/api/admin/spotify/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Error destroying session:', err);
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        res.json({ message: 'Logged out successfully' });
+    });
+});
+
+// Check authentication status
+app.get('/api/admin/auth-status', (req, res) => {
+    if (req.session.spotifyAccessToken) {
+        res.json({ authenticated: true });
+    } else {
+        res.json({ authenticated: false });
+    }
+});
+
+// Get user's Spotify playlists
+app.get('/api/admin/spotify/playlists', requireAuth, async (req, res) => {
+    try {
+        // Refresh token if expired
+        if (Date.now() >= req.session.spotifyTokenExpiry) {
+            const data = await spotifyApi.refreshAccessToken();
+            req.session.spotifyAccessToken = data.body.access_token;
+            req.session.spotifyTokenExpiry = Date.now() + data.body.expires_in * 1000;
+            spotifyApi.setAccessToken(data.body.access_token);
+        } else {
+            spotifyApi.setAccessToken(req.session.spotifyAccessToken);
+        }
+
+        const data = await spotifyApi.getUserPlaylists({ limit: 50 });
+        const playlists = data.body.items.map(playlist => ({
+            id: playlist.id,
+            name: playlist.name,
+            description: playlist.description,
+            images: playlist.images,
+            tracks: { total: playlist.tracks.total },
+            owner: playlist.owner.display_name,
+            public: playlist.public
+        }));
+
+        res.json(playlists);
+    } catch (error) {
+        console.error('Error fetching playlists:', error);
+        res.status(500).json({ error: 'Failed to fetch playlists' });
+    }
+});
+
+// Get tracks from a specific playlist
+app.get('/api/admin/spotify/playlist/:id/tracks', requireAuth, async (req, res) => {
+    try {
+        // Refresh token if expired
+        if (Date.now() >= req.session.spotifyTokenExpiry) {
+            const data = await spotifyApi.refreshAccessToken();
+            req.session.spotifyAccessToken = data.body.access_token;
+            req.session.spotifyTokenExpiry = Date.now() + data.body.expires_in * 1000;
+            spotifyApi.setAccessToken(data.body.access_token);
+        } else {
+            spotifyApi.setAccessToken(req.session.spotifyAccessToken);
+        }
+
+        const playlistId = req.params.id;
+        const data = await spotifyApi.getPlaylistTracks(playlistId, { limit: 100 });
+
+        const tracks = data.body.items
+            .filter(item => item.track) // Filter out null tracks
+            .map(item => ({
+                id: item.track.id,
+                name: item.track.name,
+                artist: item.track.artists.map(a => a.name).join(', '),
+                album: item.track.album.name,
+                albumArt: item.track.album.images[0]?.url,
+                releaseDate: item.track.album.release_date,
+                duration_ms: item.track.duration_ms,
+                popularity: item.track.popularity,
+                preview_url: item.track.preview_url,
+                spotify_uri: item.track.uri
+            }));
+
+        res.json(tracks);
+    } catch (error) {
+        console.error('Error fetching playlist tracks:', error);
+        res.status(500).json({ error: 'Failed to fetch playlist tracks' });
+    }
+});
+
+// Import playlist metadata (without audio files)
+app.post('/api/admin/spotify/import-playlist', requireAuth, async (req, res) => {
+    const { tracks } = req.body;
+
+    if (!tracks || !Array.isArray(tracks) || tracks.length === 0) {
+        return res.status(400).json({ error: 'Invalid tracks data' });
+    }
+
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+
+        // Get the current max songNumber
+        const maxSong = await songsCollection.findOne({}, { sort: { songNumber: -1 } });
+        let nextSongNumber = maxSong ? maxSong.songNumber + 1 : 1;
+
+        const importedSongs = [];
+
+        for (const track of tracks) {
+            const songDoc = {
+                songNumber: nextSongNumber++,
+                mp3_filename: `song${nextSongNumber - 1}.mp3`, // Placeholder, will be updated when audio is uploaded
+                song_name: track.name,
+                artist_name: track.artist,
+
+                // Spotify metadata
+                spotify_id: track.id,
+                spotify_preview_url: track.preview_url,
+                spotify_uri: track.spotify_uri,
+                album_name: track.album,
+                album_art_url: track.albumArt,
+                release_date: track.releaseDate,
+                duration_ms: track.duration_ms,
+                popularity: track.popularity,
+
+                // Game metadata
+                has_audio: false, // Will be set to true when audio file is uploaded
+                difficulty: 'medium',
+                category: req.body.category || 'spotify-import',
+                uploaded_by: req.session.spotifyUserId || 'admin',
+                created_at: new Date()
+            };
+
+            await songsCollection.insertOne(songDoc);
+            importedSongs.push(songDoc);
+        }
+
+        res.json({
+            message: `Successfully imported ${importedSongs.length} songs`,
+            songs: importedSongs
+        });
+    } catch (error) {
+        console.error('Error importing playlist:', error);
+        res.status(500).json({ error: 'Failed to import playlist' });
+    }
+});
+
+// Get all songs (for admin management)
+app.get('/api/admin/songs', requireAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+        const songs = await songsCollection.find({}).sort({ songNumber: 1 }).toArray();
+        res.json(songs);
+    } catch (error) {
+        console.error('Error fetching songs:', error);
+        res.status(500).json({ error: 'Failed to fetch songs' });
+    }
+});
+
+// Update song metadata
+app.put('/api/admin/songs/:id', requireAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+        const { ObjectId } = require('mongodb');
+
+        const result = await songsCollection.updateOne(
+            { _id: new ObjectId(req.params.id) },
+            { $set: req.body }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        res.json({ message: 'Song updated successfully' });
+    } catch (error) {
+        console.error('Error updating song:', error);
+        res.status(500).json({ error: 'Failed to update song' });
+    }
+});
+
+// Delete song
+app.delete('/api/admin/songs/:id', requireAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+        const { ObjectId } = require('mongodb');
+
+        const result = await songsCollection.deleteOne({ _id: new ObjectId(req.params.id) });
+
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        res.json({ message: 'Song deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting song:', error);
+        res.status(500).json({ error: 'Failed to delete song' });
+    }
+});
+
+// ========================================
+// GAME ENDPOINTS
+// ========================================
 
 // POST route to handle guesses from the frontend
 app.post('/submit-guesses', async (req, res) => {

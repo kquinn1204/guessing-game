@@ -189,36 +189,47 @@ Songs now include optional Spotify metadata:
 }
 ```
 
-## Known Limitations & Future Enhancements
+## Features Completed
 
-### Current Limitations
-1. **No audio upload yet** - Metadata import only
-   - Songs imported without MP3 files
-   - `has_audio` field is `false`
-   - Will need separate upload feature
+### ✅ Audio Upload System (COMPLETE)
+- Full MP3 file upload functionality
+- 10MB file size limit with validation
+- Audio file storage in persistent volume
+- Automatic old file deletion on replacement
+- `has_audio` flag management
 
-2. **No Spotify preview_url** - Deprecated by Spotify Nov 2024
+### ✅ Song Management UI (COMPLETE)
+- Tabbed navigation (Import | Manage Songs)
+- Visual table with album art
+- Status badges (Has Audio / No Audio)
+- Upload/Replace/Delete buttons
+- Real-time status updates
+- File validation and error handling
+
+### Known Limitations
+1. **No Spotify preview_url** - Deprecated by Spotify Nov 2024
    - Field stored but always null
-   - Must upload own audio clips
+   - Admin must source and upload own audio clips
+
+2. **Manual audio sourcing required**
+   - Admin must obtain 30-second clips from legitimate sources
+   - Cannot download directly from Spotify
+   - Suggested sources: CD rips, iTunes purchases, etc.
 
 ### Future Enhancements
-1. **Audio Upload System**
-   - Use `multer` (already in dependencies)
-   - Upload 30-second MP3 clips
-   - Link to imported song metadata
-   - Set `has_audio` to `true`
+1. **Bulk audio upload**
+   - Upload multiple files at once
+   - Auto-match files to songs by name
 
-2. **Song Management UI**
-   - View all imported songs
-   - Edit metadata
-   - Delete songs
-   - Mark which songs have audio
-
-3. **Game Creation**
+2. **Game Creation**
    - Create custom games from imported songs
    - Assign to teams/categories
    - Set difficulty levels
    - Schedule challenges
+
+3. **Audio preview in admin panel**
+   - Play uploaded audio before publishing
+   - Verify quality and timing
 
 ## Security
 

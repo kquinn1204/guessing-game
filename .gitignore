@@ -1,3 +1,15 @@
 dockerfiles/*
 !dockerfiles/
 !dockerfiles/**
+
+# Environment files with secrets
+.env
+.env.*
+*.env
+!.env.example
+
+# Spotify credentials
+.env.spotify
+
+# Claude Code
+.claude/

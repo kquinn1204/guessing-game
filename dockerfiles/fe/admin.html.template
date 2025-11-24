@@ -261,6 +261,97 @@
             color: #667eea;
             margin-top: 10px;
         }
+
+        /* Song Management Styles */
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .nav-tab:hover {
+            color: #667eea;
+        }
+
+        .nav-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+        }
+
+        .songs-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .songs-table th {
+            background: #f8f9fa;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .songs-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .songs-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .status-badge.has-audio {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.no-audio {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .upload-form {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .upload-form input[type="file"] {
+            font-size: 0.85em;
+        }
+
+        .album-art-small {
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
     </style>
 </head>
 <body>
@@ -283,6 +374,12 @@
             <p>Please login with Spotify to import playlists and manage songs.</p>
         </div>
 
+        <!-- Navigation Tabs (shown when authenticated) -->
+        <div id="navTabs" class="nav-tabs hidden">
+            <button class="nav-tab active" id="tabPlaylists">Import from Spotify</button>
+            <button class="nav-tab" id="tabManageSongs">Manage Songs</button>
+        </div>
+
         <!-- Playlists Section -->
         <div id="playlistsSection" class="section hidden">
             <h2 class="section-title">Your Spotify Playlists</h2>
@@ -300,6 +397,28 @@
             <div class="import-controls hidden" id="importControls">
                 <button class="btn btn-secondary" id="importBtn">Import Selected Songs</button>
             </div>
+        </div>
+
+        <!-- Manage Songs Section -->
+        <div id="manageSongsSection" class="section hidden">
+            <h2 class="section-title">Manage Songs</h2>
+            <p>Upload audio files for imported songs. Only songs with audio can be used in the game.</p>
+            <div class="loading" id="songsLoading">Loading songs...</div>
+            <table class="songs-table hidden" id="songsTable">
+                <thead>
+                    <tr>
+                        <th>Album Art</th>
+                        <th>Song</th>
+                        <th>Artist</th>
+                        <th>Album</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="songsTableBody">
+                    <!-- Songs will be inserted here -->
+                </tbody>
+            </table>
         </div>
     </div>
 

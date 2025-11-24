@@ -1,9 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const SpotifyWebApi = require('spotify-web-api-node');
 const session = require('express-session');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
 // Simple Levenshtein distance function for fuzzy matching
 function levenshteinDistance(str1, str2) {
@@ -61,7 +64,7 @@ app.use(bodyParser.json());
 // Allow all origins (CORS policy for open access)
 app.use(cors({
     origin: '*',
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type'],
     credentials: true
 }));
@@ -80,6 +83,49 @@ const scopes = [
     'playlist-read-private',
     'playlist-read-collaborative'
 ];
+
+// Audio upload configuration
+const AUDIO_UPLOAD_DIR = process.env.AUDIO_UPLOAD_DIR || '/usr/src/app/uploads/audio';
+
+// Ensure upload directory exists
+if (!fs.existsSync(AUDIO_UPLOAD_DIR)) {
+    fs.mkdirSync(AUDIO_UPLOAD_DIR, { recursive: true });
+    console.log(`Created audio upload directory: ${AUDIO_UPLOAD_DIR}`);
+}
+
+// Configure multer for audio file uploads
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, AUDIO_UPLOAD_DIR);
+    },
+    filename: function (req, file, cb) {
+        // Use songId from request body to create filename
+        const songId = req.body.songId;
+        const ext = path.extname(file.originalname);
+        // Generate filename: songId_timestamp.mp3
+        cb(null, `${songId}_${Date.now()}${ext}`);
+    }
+});
+
+// File filter to only accept MP3 files
+const fileFilter = (req, file, cb) => {
+    const allowedTypes = ['audio/mpeg', 'audio/mp3'];
+    const ext = path.extname(file.originalname).toLowerCase();
+
+    if (allowedTypes.includes(file.mimetype) || ext === '.mp3') {
+        cb(null, true);
+    } else {
+        cb(new Error('Only MP3 files are allowed'), false);
+    }
+};
+
+const upload = multer({
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
 
 // MongoDB connection URL and database name
 const mongoUrl = process.env.MONGO_URL || 'mongodb://mongodb-service:27017';
@@ -360,7 +406,6 @@ app.delete('/api/admin/songs/:id', requireAuth, async (req, res) => {
     try {
         await connectToDatabase();
         const songsCollection = db.collection('songs');
-        const { ObjectId } = require('mongodb');
 
         const result = await songsCollection.deleteOne({ _id: new ObjectId(req.params.id) });
 
@@ -372,6 +417,85 @@ app.delete('/api/admin/songs/:id', requireAuth, async (req, res) => {
     } catch (error) {
         console.error('Error deleting song:', error);
         res.status(500).json({ error: 'Failed to delete song' });
+    }
+});
+
+// Upload audio file for a song
+app.post('/api/admin/upload-audio/:id', requireAuth, upload.single('audioFile'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No audio file provided' });
+        }
+
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+
+        // Find the song
+        const song = await songsCollection.findOne({ _id: new ObjectId(req.params.id) });
+
+        if (!song) {
+            // Delete uploaded file if song not found
+            fs.unlinkSync(req.file.path);
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        // Delete old audio file if it exists
+        if (song.mp3_filename && song.has_audio) {
+            const oldFilePath = path.join(AUDIO_UPLOAD_DIR, song.mp3_filename);
+            if (fs.existsSync(oldFilePath)) {
+                fs.unlinkSync(oldFilePath);
+                console.log(`Deleted old audio file: ${oldFilePath}`);
+            }
+        }
+
+        // Update song with new audio filename
+        const filename = req.file.filename;
+        const result = await songsCollection.updateOne(
+            { _id: new ObjectId(req.params.id) },
+            {
+                $set: {
+                    mp3_filename: filename,
+                    has_audio: true,
+                    audio_uploaded_at: new Date()
+                }
+            }
+        );
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Song not found' });
+        }
+
+        console.log(`Audio uploaded for song: ${song.song_name} - File: ${filename}`);
+
+        res.json({
+            message: 'Audio file uploaded successfully',
+            filename: filename,
+            songId: req.params.id
+        });
+    } catch (error) {
+        console.error('Error uploading audio:', error);
+        // Clean up uploaded file on error
+        if (req.file && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        res.status(500).json({ error: 'Failed to upload audio file' });
+    }
+});
+
+// Get audio file
+app.get('/audio/:filename', async (req, res) => {
+    try {
+        const filename = req.params.filename;
+        const filePath = path.join(AUDIO_UPLOAD_DIR, filename);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'Audio file not found' });
+        }
+
+        res.sendFile(filePath);
+    } catch (error) {
+        console.error('Error serving audio file:', error);
+        res.status(500).json({ error: 'Failed to serve audio file' });
     }
 });
 

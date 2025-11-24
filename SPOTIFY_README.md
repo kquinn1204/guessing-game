@@ -101,18 +101,51 @@ The Spotify integration feature has been **fully implemented** and is ready for 
 This will:
 1. Create `music-game-spotify` namespace
 2. Deploy MongoDB, backend, frontend
-3. Create routes with HTTPS/TLS
-4. Inject Spotify credentials
+3. Create routes with HTTPS/TLS (dynamic cluster URLs)
+4. Inject Spotify credentials with **actual redirect URI**
 5. Configure all services
+6. **Display the exact redirect URI to add to Spotify**
+
+**Important:** After deployment, the script will show you the exact redirect URI. Copy this URL and add it to your Spotify app settings.
+
+### Update Spotify Redirect URI
+
+**Critical Step:** The cluster route URL changes each time you create a new cluster (the `apps.ci-ln-XXXXXX-XXXXX` part is unique per cluster).
+
+After running `./scripts/deploy-spotify.sh`, you'll see output like:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️  IMPORTANT: Update Spotify App Redirect URI
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Add this redirect URI to your Spotify app settings:
+
+👉 https://nodejs-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
+
+Steps:
+1. Go to: https://developer.spotify.com/dashboard
+2. Click on your app
+3. Click 'Edit Settings'
+4. Add the redirect URI above to 'Redirect URIs'
+5. Click 'Save'
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+**Just copy the URL and paste it into your Spotify Developer Dashboard.** The deployment script automatically detects your cluster's route and configures everything correctly.
 
 ### Testing Checklist
 
-1. **Access Admin Panel**
-   ```
-   https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/admin
-   ```
+1. **Update Spotify Redirect URI (REQUIRED FIRST)**
+   - Copy the redirect URI from deployment output
+   - Go to https://developer.spotify.com/dashboard
+   - Edit your app → Add redirect URI → Save
 
-2. **Test OAuth Flow**
+2. **Access Admin Panel**
+   - URL will be shown in deployment output
+   - Format: `https://nodejs-route-music-game-spotify.apps.ci-ln-XXXXXX-XXXXX.aws-4.ci.openshift.org/admin`
+
+3. **Test OAuth Flow**
    - Click "Login with Spotify"
    - Should redirect to Spotify
    - Authorize the app

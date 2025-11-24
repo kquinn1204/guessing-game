@@ -29,13 +29,60 @@ The Spotify integration allows admins to:
 - Spotify account with playlists
 - 30-second MP3 clips of songs you want to use (sourced legally from CDs, purchases, etc.)
 - Access to the admin panel
+- **Spotify app redirect URI updated (see below)**
+
+### Step 0: Update Spotify Redirect URI (FIRST TIME SETUP)
+
+**Critical:** Before using the admin panel, you must update your Spotify app settings with the correct redirect URI.
+
+1. **Deploy the application** first:
+   ```bash
+   ./scripts/deploy-spotify.sh
+   ```
+
+2. **The script will display** the exact redirect URI you need:
+   ```
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ⚠️  IMPORTANT: Update Spotify App Redirect URI
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Add this redirect URI to your Spotify app settings:
+
+   👉 https://nodejs-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
+
+   Steps:
+   1. Go to: https://developer.spotify.com/dashboard
+   2. Click on your app
+   3. Click 'Edit Settings'
+   4. Add the redirect URI above to 'Redirect URIs'
+   5. Click 'Save'
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ```
+
+3. **Copy the redirect URI** from the terminal output
+
+4. **Go to** https://developer.spotify.com/dashboard
+
+5. **Click** on your Spotify app
+
+6. **Click** "Edit Settings"
+
+7. **In the "Redirect URIs" field**, paste the URL you copied
+
+8. **Click** "Add" then "Save"
+
+**Why this is needed:** The cluster route URL changes each time you create a new cluster. The part `apps.ci-ln-XXXXXX-XXXXX` is unique per cluster, so the redirect URI must be updated to match your current cluster.
+
+**Note:** You only need to do this once per cluster deployment. If you redeploy to the same cluster, the URL stays the same.
 
 ### Step 1: Access Admin Panel
 
-1. Navigate to the admin panel URL:
+1. Navigate to the admin panel URL (shown in deployment output):
    ```
-   https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/admin
+   https://nodejs-route-music-game-spotify.apps.ci-ln-XXXXXX-XXXXX.aws-4.ci.openshift.org/admin
    ```
+
+   **Note:** The exact URL will be displayed when you run `./scripts/deploy-spotify.sh`
 
 2. You'll see the welcome screen with authentication status showing "Not Authenticated"
 
@@ -333,6 +380,26 @@ Songs are ready for players when:
 
 ### Admin Panel Issues
 
+#### "INVALID_CLIENT: Invalid redirect URI" error
+**Cause:** Redirect URI in Spotify app doesn't match the cluster route
+
+**Solutions:**
+1. Get the correct redirect URI from deployment output
+2. Or run: `echo "https://$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback"`
+3. Go to https://developer.spotify.com/dashboard
+4. Edit your app → Redirect URIs
+5. Add the exact URL (must match exactly, including `/api/admin/spotify/callback`)
+6. Remove old redirect URIs from previous clusters
+7. Click Save
+8. Wait 10-30 seconds for changes to propagate
+9. Try logging in again
+
+**Common Mistakes:**
+- Using old cluster URL (apps.ci-ln-**old**-**cluster**.aws-4...)
+- Missing `/api/admin/spotify/callback` path
+- Using `http://` instead of `https://`
+- Typo in the URL
+
 #### "Not Authenticated" after login
 **Cause:** Session cookies not being set
 
@@ -341,6 +408,7 @@ Songs are ready for players when:
 2. Verify HTTPS is enabled on backend route
 3. Clear browser cache and cookies
 4. Try incognito/private browsing mode
+5. Verify redirect URI is correct in Spotify (see above)
 
 #### "Failed to fetch playlists"
 **Cause:** Spotify token expired or invalid
@@ -348,7 +416,7 @@ Songs are ready for players when:
 **Solutions:**
 1. Logout and login again
 2. Check Spotify app credentials are correct
-3. Verify redirect URI matches exactly
+3. Verify redirect URI matches exactly (see first troubleshooting item)
 4. Check backend logs: `oc logs deployment/nodejs-app -n music-game-spotify`
 
 #### Upload fails with "Only MP3 files are allowed"

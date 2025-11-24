@@ -67,18 +67,16 @@ We're using **Option A** - deploying Spotify integration in a completely separat
 6. Updated deployment manifests for new namespace
 7. Created new container image names
 8. Created deployment automation scripts
+9. ✅ Implemented Spotify OAuth backend flow
+10. ✅ Created admin panel UI with playlist browsing
+11. ✅ Built and pushed container images to quay.io
 
-### 🚧 In Progress
-9. Implement Spotify OAuth backend flow
-10. Create admin panel UI
-
-### 📋 TODO
-11. Build playlist browsing functionality
-12. Add audio upload system
-13. Update database schema for Spotify metadata
-14. Build and push container images
-15. Deploy to music-game-spotify namespace
-16. Test full workflow
+### 📋 TODO (When Cluster is Online)
+12. Deploy to music-game-spotify namespace
+13. Test Spotify OAuth flow
+14. Test playlist browsing functionality
+15. Add audio upload system (future enhancement)
+16. Test full admin workflow
 
 ## Spotify API Configuration
 

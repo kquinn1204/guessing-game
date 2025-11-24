@@ -1,5 +1,18 @@
 # Deploying the music guessing game
 
+## Overview
+
+This music guessing game application features a three-tier architecture with:
+- **Frontend**: Nginx serving HTML/JavaScript interface
+- **Backend**: Node.js/Express API with leaderboard functionality
+- **Database**: MongoDB for storing songs and player statistics
+
+### Key Features
+- Interactive music guessing gameplay
+- Player scoring system tracking song and artist guesses
+- Real-time leaderboard displaying top 10 players
+- Top player display showing current leader
+
 ## 1. Create the Namespace 
 
 
@@ -304,9 +317,9 @@ spec:
 $ oc apply -f deploybemongo.yaml
 ```
 
-### Node.js Backend Deployment 
+### Node.js Backend Deployment
 
-1. Deploy the node.js application:
+1. Deploy the node.js application with leaderboard support:
 
 ``` highlight
 apiVersion: apps/v1
@@ -328,7 +341,7 @@ spec:
     spec:
       containers:
       - name: nodejs-app
-        image: quay.io/rhn_support_kquinn/middleware-node-js-app-artists-sep-remove:latest
+        image: quay.io/rhn_support_kquinn/middleware-js-artists-sep-remove-leader:latest
         ports:
         - containerPort: 3000
         resources:
@@ -361,9 +374,9 @@ spec:
 $ oc apply -f nodejs-deployment.yaml
 ```
 
-### Nginx Frontend Deployment 
+### Nginx Frontend Deployment
 
-1. Deploy the Nginx application:
+1. Deploy the Nginx application with leaderboard UI:
 
 ``` highlight
 apiVersion: apps/v1
@@ -385,7 +398,7 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: quay.io/rhn_support_kquinn/fe_revised_artist_sep_remove_song_select:latest
+        image: quay.io/rhn_support_kquinn/fe_sep_remove_song_select_leader:latest
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -401,7 +414,7 @@ spec:
           runAsUser: 0               # Run as root user (UID 0)
           allowPrivilegeEscalation: true  # Allow privilege escalation if needed
         command: ["/bin/sh"]
-        args: ["-c", 
+        args: ["-c",
         "envsubst '${BACKEND_URL}' < /usr/share/nginx/html/index.html.template > /usr/share/nginx/html/index.html && \
          envsubst '${BACKEND_URL}' < /usr/share/nginx/html/script.js.template > /usr/share/nginx/html/script.js && \
          envsubst '${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /tmp/nginx.conf && \
@@ -416,3 +429,84 @@ spec:
 ``` highlight
 $ oc apply -f html_deploy_fe.yaml
 ```
+
+## 8. Leaderboard Feature
+
+The application includes a leaderboard system that tracks player performance
+and displays top players.
+
+### Backend API Endpoints
+
+The Node.js backend provides the following leaderboard endpoints:
+
+#### GET /leaderboard
+
+Returns the top 10 players sorted by their total score (correct songs + correct artists).
+
+**Response Example:**
+``` json
+[
+  {
+    "_id": "player_id",
+    "playerName": "John",
+    "correctSongGuesses": 5,
+    "correctArtistGuesses": 4,
+    "totalScore": 9,
+    "playedAt": "2025-11-24T10:30:00Z"
+  }
+]
+```
+
+#### GET /top-player
+
+Returns the single highest-scoring player.
+
+**Response Example:**
+``` json
+{
+  "playerName": "Jane",
+  "correctSongGuesses": 8,
+  "correctArtistGuesses": 7,
+  "totalCorrectGuesses": 15,
+  "timestamp": "2025-11-24T11:00:00Z"
+}
+```
+
+#### POST /submit-guesses
+
+Submits player guesses and automatically updates the leaderboard. This endpoint
+now stores player statistics in the MongoDB `players` collection.
+
+**Request Example:**
+``` json
+{
+  "playerName": "John",
+  "guesses": [
+    {
+      "songFile": "song1",
+      "songGuess": "Bohemian Rhapsody",
+      "artistGuess": "Queen"
+    }
+  ]
+}
+```
+
+### Frontend Integration
+
+After submitting all guesses, the frontend displays:
+- Total correct song and artist guesses
+- List of correct answers
+- Current top player with their score
+
+### Database Collections
+
+The application uses two MongoDB collections:
+
+- **songs**: Contains song metadata (song_name, artist_name, mp3_filename)
+- **players**: Stores player statistics including:
+  - playerName
+  - guesses (total number of guesses)
+  - correctSongGuesses
+  - correctArtistGuesses
+  - results (detailed guess history)
+  - timestamp (last played time)

@@ -209,4 +209,27 @@ app.get('/top-player', async (req, res) => {
         res.json({
             playerName: topPlayer[0].playerName,
             correctSongGuesses: topPlayer[0].correctSongGuesses || 0,
-            correctArtistGuesses: topPlayer[0].correctArtistGuesses
+            correctArtistGuesses: topPlayer[0].correctArtistGuesses || 0,
+            totalCorrectGuesses: topPlayer[0].totalCorrectGuesses || 0,
+            timestamp: topPlayer[0].timestamp
+        });
+    } catch (error) {
+        console.error('Error fetching top player:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// Middleware to log frontend URL from Referer header
+app.use((req, res, next) => {
+    const referer = req.get('Referer');
+    if (referer) {
+        const frontendUrl = new URL(referer).origin;
+        console.log(`Frontend URL: ${frontendUrl}`);
+    }
+    next();
+});
+
+// Start the backend server
+app.listen(port, () => {
+    console.log(`Server is running on port ${port}`);
+});

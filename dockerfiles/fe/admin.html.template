@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - Music Guessing Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2em;
+        }
+
+        .auth-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #1DB954;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #1ed760;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(29, 185, 84, 0.4);
+        }
+
+        .btn-secondary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5568d3;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .auth-status {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .auth-status.authenticated {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .auth-status.not-authenticated {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .playlists-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .playlist-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+
+        .playlist-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            border-color: #667eea;
+        }
+
+        .playlist-card img {
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .playlist-card h3 {
+            font-size: 1.1em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .playlist-card p {
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .tracks-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        .track-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .track-item:hover {
+            background: #e9ecef;
+        }
+
+        .track-item input[type="checkbox"] {
+            margin-right: 15px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .track-item img {
+            width: 60px;
+            height: 60px;
+            border-radius: 5px;
+            margin-right: 15px;
+        }
+
+        .track-info {
+            flex: 1;
+        }
+
+        .track-info h4 {
+            font-size: 1em;
+            margin-bottom: 5px;
+            color: #333;
+        }
+
+        .track-info p {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2em;
+            color: #667eea;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .import-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .import-controls button {
+            flex: 1;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .selected-count {
+            font-weight: bold;
+            color: #667eea;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎵 Admin Panel</h1>
+            <div class="auth-section">
+                <span id="authStatus" class="auth-status not-authenticated">Not Authenticated</span>
+                <a href="${BACKEND_URL}/api/admin/spotify/login" class="btn btn-primary" id="loginBtn">Login with Spotify</a>
+                <button class="btn btn-danger hidden" id="logoutBtn">Logout</button>
+            </div>
+        </header>
+
+        <div id="errorMessage" class="error hidden"></div>
+        <div id="successMessage" class="success hidden"></div>
+
+        <!-- Welcome Section -->
+        <div id="welcomeSection" class="section">
+            <h2 class="section-title">Welcome to the Admin Panel</h2>
+            <p>Please login with Spotify to import playlists and manage songs.</p>
+        </div>
+
+        <!-- Playlists Section -->
+        <div id="playlistsSection" class="section hidden">
+            <h2 class="section-title">Your Spotify Playlists</h2>
+            <div class="loading" id="playlistsLoading">Loading playlists...</div>
+            <div class="playlists-grid" id="playlistsGrid"></div>
+        </div>
+
+        <!-- Tracks Section -->
+        <div id="tracksSection" class="section hidden">
+            <a href="#" class="back-link" id="backToPlaylists">← Back to Playlists</a>
+            <h2 class="section-title" id="playlistTitle">Playlist Tracks</h2>
+            <p class="selected-count">Selected: <span id="selectedCount">0</span> / 10 max</p>
+            <div class="loading" id="tracksLoading">Loading tracks...</div>
+            <div class="tracks-list" id="tracksList"></div>
+            <div class="import-controls hidden" id="importControls">
+                <button class="btn btn-secondary" id="importBtn">Import Selected Songs</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin-script.js"></script>
+</body>
+</html>

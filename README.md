@@ -1,512 +1,412 @@
-# Deploying the music guessing game
+# Music Guessing Game with Spotify Integration
 
 ## Overview
 
-This music guessing game application features a three-tier architecture with:
-- **Frontend**: Nginx serving HTML/JavaScript interface
-- **Backend**: Node.js/Express API with leaderboard functionality
-- **Database**: MongoDB for storing songs and player statistics
+This music guessing game application features a modern three-tier architecture with Spotify integration:
+- **Frontend**: Nginx serving HTML/JavaScript interface with dynamic song loading
+- **Backend**: Node.js/Express API with Spotify OAuth, audio management, and leaderboard functionality
+- **Database**: MongoDB for storing songs, player statistics, and metadata
 
 ### Key Features
-- Interactive music guessing gameplay
-- Player scoring system tracking song and artist guesses
-- Real-time leaderboard displaying top 10 players
-- Top player display showing current leader
+- 🎵 **Spotify Integration**: Import song metadata directly from your Spotify playlists
+- 🤖 **Hybrid Audio System**:
+  - Automatic download of 30-second Spotify preview clips
+  - Manual upload option for full songs or songs without previews
+- 📊 **Dynamic Song Management**: Game automatically loads available songs from database
+- 🎮 **Interactive Gameplay**: Music guessing with real-time feedback
+- 🏆 **Leaderboard System**: Track top players with daily, weekly, and all-time rankings
+- 🎨 **Album Art Integration**: Beautiful UI with Spotify album artwork
+- 👤 **Admin Panel**: Full song management with OAuth authentication
 
-## 1. Create the Namespace 
+## Quick Start
 
+### For Spotify Integration Deployment
 
-1. Create a `music-game` namespace to isolate the resources for the
-application.
+See [WORKFLOW.md](WORKFLOW.md) for complete step-by-step guide.
 
-``` highlight
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: music-game
+**Prerequisites:**
+- OpenShift cluster
+- Spotify Developer account
+- Quay.io account (for container images)
+
+**Quick Deploy:**
+```bash
+./scripts/deploy-spotify.sh
 ```
 
-2. Apply the namespace definition:
+This will:
+1. Create namespace and resources
+2. Deploy MongoDB, Node.js backend, and Nginx frontend
+3. Configure routes and ConfigMaps
+4. Display admin panel URL and Spotify redirect URI
 
-``` highlight
-$ oc apply -f appns.yaml
+### Update Spotify App Settings
+
+After deployment, update your Spotify app with the redirect URI shown in the deployment output:
+
+```bash
+https://nodejs-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/admin/spotify/callback
 ```
 
-## 2. Elevate Privileges for the default Service Account 
+## Deployment Guide
 
-The default policy is restrictive, so you may need to temporarily
-elevate the privileges for the default service account until a dedicated
-service account is set up for the `music-game` namespace.
+### 1. Create the Namespace
 
-``` highlight
-$ oc adm policy add-scc-to-user privileged -z default -n music-game
+Create a dedicated namespace for the Spotify integration:
+
+```bash
+oc apply -f deployment-spotify/namespace.yaml
 ```
 
-## 3. Deploy Services 
+### 2. Deploy Services
 
-1. Change to the `services-files` directory:
+Navigate to the services directory and apply all service definitions:
 
-``` highlight
-$ cd ../services-files
+```bash
+cd deployment-spotify/service-files
+oc apply -f mongodb-service.yaml
+oc apply -f nodejs-service.yaml
+oc apply -f feservice.yaml
 ```
 
-### Frontend HTML Service 
+Services created:
+- `mongodb-service` - Internal MongoDB access (port 27017)
+- `nodejs-service` - Backend API (ClusterIP on port 3000)
+- `frontend-html-service` - Frontend service (port 8080)
 
-1. Create a service to expose the Nginx frontend:
+### 3. Create Routes
 
-``` highlight
-apiVersion: v1
-kind: Service
-metadata:
-  name: frontend-html-service
-  namespace: music-game
-spec:
-  type: LoadBalancer
-  selector:
-    app: nginx
-  ports:
-    - protocol: TCP
-      port: 80
-      targetPort: 8080
+Create routes to expose the application:
+
+```bash
+cd ../route-files
+oc apply -f nodejs-route.yaml
+oc apply -f feroute.yaml
 ```
 
-2. Apply the frontend service YAML:
+Routes:
+- `nodejs-route` - Backend API with HTTPS
+- `nginx-route` - Frontend with HTTPS and edge TLS termination
 
-``` highlight
-$ oc apply -f feservice.yaml
+### 4. Create ConfigMaps and Secrets
+
+#### Backend URL ConfigMap
+```bash
+oc create configmap backend-config -n music-game-spotify \
+  --from-literal=BACKEND_URL=nodejs-service
 ```
 
-### MongoDB Service 
-
-1. Create a service for MongoDB:
-
-``` highlight
-apiVersion: v1
-kind: Service
-metadata:
-  name: mongodb-service
-  namespace: music-game
-spec:
-  selector:
-    app: mongodb
-  ports:
-    - protocol: TCP
-      port: 27017
-      targetPort: 27017
+#### Frontend URL ConfigMap
+```bash
+oc create configmap frontend-url-config -n music-game-spotify \
+  --from-literal=FRONTEND_URL=https://$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
 ```
 
-2. Apply the MongoDB service definition:
-
-``` highlight
-$ oc apply -f servicedb.yaml
+#### Allowed Origins ConfigMap
+```bash
+oc create configmap frontend-config -n music-game-spotify \
+  --from-literal=ALLOWED_ORIGINS=https://$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
 ```
 
-### Node.js Service
-
-1. Create a service to expose the Node.js backend:
-
-``` highlight
-apiVersion: v1
-kind: Service
-metadata:
-  name: nodejs-service
-  namespace: music-game
-spec:
-  type: ClusterIP
-  ports:
-    - port: 80
-      targetPort: 3000
-  selector:
-    app: nodejs-app
+#### Spotify Credentials Secret
+```bash
+oc create secret generic spotify-credentials -n music-game-spotify \
+  --from-literal=SPOTIFY_CLIENT_ID='your_client_id' \
+  --from-literal=SPOTIFY_CLIENT_SECRET='your_client_secret' \
+  --from-literal=SPOTIFY_REDIRECT_URI=https://$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback
 ```
 
-2. Apply the Node.js service YAML:
+### 5. Deploy Persistent Volumes
 
-``` highlight
-$ oc apply -f nodejs-service.yaml
+Create persistent storage for MongoDB and audio files:
+
+```bash
+cd ../pv-files
+oc apply -f pvcmongo.yaml
+oc apply -f audio-storage-pvc.yaml
 ```
 
-## 4. Create Routes 
+Storage:
+- `mongodb-pvc` - 5Gi for MongoDB data (gp3-csi)
+- `audio-storage-pvc` - 5Gi for audio files (gp3-csi, ReadWriteOnce)
 
-1. Change to the `route-files` directory:
+### 6. Deploy Application Components
 
-``` highlight
-$ cd ../route-files
-```
-### Node.js Route 
+Deploy MongoDB, Node.js backend, and Nginx frontend:
 
-1. Create a route to expose the Node.js backend:
-
-``` highlight
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: nodejs-route
-  namespace: music-game
-spec:
-  to:
-    kind: Service
-    name: nodejs-service
-  port:
-    targetPort: 3000
+```bash
+cd ..
+oc apply -f deploybemongo.yaml
+oc apply -f nodejs-deployment.yaml
+oc apply -f html_deploy_fe.yaml
 ```
 
-2. Apply the Node.js route definition:
+**Important Configuration Notes:**
 
-``` highlight
-$ oc apply -f nodejs-route.yaml
-```
+**MongoDB:**
+- Deployment: `mongodb`
+- Replicas: 2
+- Image: `quay.io/rhn_support_kquinn/be-mongo-db-spotify:latest`
+- Persistent storage mounted at `/data/db`
 
-### Nginx Route 
+**Node.js Backend:**
+- Deployment: `nodejs-app`
+- Replicas: 1 (due to ReadWriteOnce PVC constraint)
+- Image: `quay.io/rhn_support_kquinn/middleware-spotify:latest`
+- Environment variables:
+  - `MONGO_URL`: MongoDB connection string
+  - `SPOTIFY_CLIENT_ID`: From secret
+  - `SPOTIFY_CLIENT_SECRET`: From secret
+  - `SPOTIFY_REDIRECT_URI`: From secret
+  - `FRONTEND_URL`: For OAuth redirects
+  - `AUDIO_UPLOAD_DIR`: `/usr/src/app/uploads/audio`
+- Audio storage mounted at `/usr/src/app/uploads`
 
-1. Create a route to expose the frontend service:
+**Nginx Frontend:**
+- Deployment: `nginx-deployment`
+- Replicas: 1
+- Image: `quay.io/rhn_support_kquinn/fe-spotify-admin:latest`
+- Dynamic configuration via envsubst
+- Cookie forwarding for session management
 
-``` highlight
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: nginx-route
-  namespace: music-game
-spec:
-  to:
-    kind: Service
-    name: frontend-html-service
-  port:
-    targetPort: 8080
-```
+## Application Architecture
 
-2. Apply the frontend route definition:
+### Hybrid Audio System
 
-``` highlight
-$ oc apply -f feroute.yaml
-```
+The application uses a hybrid approach for audio management:
 
-## 5. Create ConfigMaps
+#### Automatic Preview Download
+When importing songs from Spotify:
+- System checks for available 30-second preview clips
+- Automatically downloads previews in the background
+- Songs with previews are immediately playable
+- Status: 🎵 "Preview (30s)"
 
-Create ConfigMaps to dynamically manage configuration values for the
-backend URL and allowed origins.
+#### Manual Upload
+For songs without previews or to use full songs:
+- Admin can upload MP3 files through the UI
+- System automatically links files to song metadata
+- Replaces preview clips if desired
+- Status: ✓ "Full Song"
 
-### Create Backend URL ConfigMap 
+#### Dynamic Song Loading
+The game frontend:
+- Calls `/api/available-songs` on page load
+- Receives only songs with `has_audio: true`
+- Adapts to any number of available songs
+- Uses Spotify album art as backgrounds
 
-``` highlight
-$ oc create configmap backend-config -n music-game --from-literal=BACKEND_URL=$(oc get route nodejs-route -n music-game -o jsonpath='{.spec.host}')
-```
+### API Endpoints
 
-### Create Allowed Origins ConfigMap
+#### Public Endpoints
+- `GET /api/available-songs` - Get all songs with audio for the game
+- `POST /submit-guesses` - Submit player guesses
+- `GET /leaderboard?filter=[all|daily|weekly]` - Get top 10 players
+- `GET /top-player` - Get highest scoring player
+- `GET /audio/:filename` - Serve audio files
 
-``` highlight
-$ oc create configmap frontend-config -n music-game --from-literal=ALLOWED_ORIGINS=$(oc get route nginx-route -n music-game -o jsonpath='{.spec.host}')
-```
+#### Admin Endpoints (Requires Authentication)
+- `GET /api/admin/spotify/login` - Initiate Spotify OAuth
+- `GET /api/admin/spotify/callback` - OAuth callback handler
+- `GET /api/admin/spotify/logout` - End admin session
+- `GET /api/admin/auth-status` - Check authentication status
+- `GET /api/admin/spotify/playlists` - Get user's Spotify playlists
+- `GET /api/admin/spotify/playlist/:id/tracks` - Get playlist tracks
+- `POST /api/admin/spotify/import-playlist` - Import songs (with auto preview download)
+- `GET /api/admin/songs` - Get all songs in database
+- `PUT /api/admin/songs/:id` - Update song metadata
+- `DELETE /api/admin/songs/:id` - Delete song
+- `POST /api/admin/upload-audio/:id` - Upload audio file for a song
 
-## 6. Deploy Persistent Volume and Persistent Volume Claim 
+### Database Schema
 
-
-1. Change to the `pv-files` directory:
-
-``` highlight
-$ cd ../pv-files
-```
-
-### MongoDB PVC 
-
-
-1. Create a PVC for MongoDB:
-
-``` highlight
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mongodb-pvc
-  namespace: music-game
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: manual
-```
-
-2. Apply the PVC definition:
-
-``` highlight
-$ oc apply -f pvmongo.yaml
-```
-
-### MongoDB PV 
-
-
-1. Create a PV for MongoDB:
-
-``` highlight
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: mongodb-pv
-spec:
-  capacity:
-    storage: 5Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: /mnt/data/mongodb
-    type: DirectoryOrCreate
-  persistentVolumeReclaimPolicy: Retain
-  storageClassName: manual
-```
-
-
-2. Apply the PV definition:
-
-``` highlight
-$ oc apply -f pvcmongo.yaml
-```
-
-## 7. Deploy Application Components 
-
-1. Change to the `deployment-files` directory:
-
-``` highlight
-$ cd ../deployment-files
-```
-
-### MongoDB Deployment 
-
-
-1. Deploy MongoDB with persistent storage:
-
-``` highlight
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mongodb
-  namespace: music-game
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: mongodb
-  template:
-    metadata:
-      labels:
-        app: mongodb
-    spec:
-      securityContext:
-        fsGroup: 1000710000
-      containers:
-      - name: mongodb
-        image: quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest
-        ports:
-        - containerPort: 27017
-        volumeMounts:
-        - name: mongodb-data
-          mountPath: /data/db
-          readOnly: false
-        securityContext:
-          runAsUser: 1000710000
-          privileged: true  # Set the container to run in privileged mode
-      volumes:
-      - name: mongodb-data
-        persistentVolumeClaim:
-          claimName: mongodb-pvc
-```
-
-2. Apply the MongoDB deployment:
-
-``` highlight
-$ oc apply -f deploybemongo.yaml
-```
-
-### Node.js Backend Deployment
-
-1. Deploy the node.js application with leaderboard support:
-
-``` highlight
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nodejs-app
-  namespace: music-game
-  labels:
-    app: nodejs-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: nodejs-app
-  template:
-    metadata:
-      labels:
-        app: nodejs-app
-    spec:
-      containers:
-      - name: nodejs-app
-        image: quay.io/rhn_support_kquinn/middleware-js-artists-sep-remove-leader:latest
-        ports:
-        - containerPort: 3000
-        resources:
-          requests:
-            cpu: 100m
-            memory: 256Mi
-          limits:
-            cpu: 500m
-            memory: 512Mi
-        env:
-        - name: MONGO_URL
-          value: 'mongodb://mongodb-service:27017'
-        - name: DB_NAME
-          value: musicgame
-        - name: ALLOWED_ORIGINS
-          valueFrom:
-            configMapKeyRef:
-              name: frontend-config
-              key: ALLOWED_ORIGINS
-        - name: BACKEND_URL
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config
-              key: BACKEND_URL
-```
-
-2. Apply the Node.js deployment:
-
-``` highlight
-$ oc apply -f nodejs-deployment.yaml
-```
-
-### Nginx Frontend Deployment
-
-1. Deploy the Nginx application with leaderboard UI:
-
-``` highlight
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nginx-deployment
-  namespace: music-game
-  labels:
-    app: nginx
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: quay.io/rhn_support_kquinn/fe_sep_remove_song_select_leader:latest
-        ports:
-        - containerPort: 8080
-        volumeMounts:
-        - name: cache-volume
-          mountPath: /var/cache/nginx
-        env:
-        - name: BACKEND_URL
-          valueFrom:
-            configMapKeyRef:
-              name: backend-config  # Reference the existing ConfigMap
-              key: BACKEND_URL
-        securityContext:  # Add securityContext for running as root
-          runAsUser: 0               # Run as root user (UID 0)
-          allowPrivilegeEscalation: true  # Allow privilege escalation if needed
-        command: ["/bin/sh"]
-        args: ["-c",
-        "envsubst '${BACKEND_URL}' < /usr/share/nginx/html/index.html.template > /usr/share/nginx/html/index.html && \
-         envsubst '${BACKEND_URL}' < /usr/share/nginx/html/script.js.template > /usr/share/nginx/html/script.js && \
-         envsubst '${BACKEND_URL}' < /etc/nginx/nginx.conf.template > /tmp/nginx.conf && \
-         mv /tmp/nginx.conf /etc/nginx/nginx.conf && nginx -g 'daemon off;'"]
-      volumes:
-      - name: cache-volume
-        emptyDir: {}
-```
-
-2. Apply the Nginx deployment:
-
-``` highlight
-$ oc apply -f html_deploy_fe.yaml
-```
-
-## 8. Leaderboard Feature
-
-The application includes a leaderboard system that tracks player performance
-and displays top players.
-
-### Backend API Endpoints
-
-The Node.js backend provides the following leaderboard endpoints:
-
-#### GET /leaderboard
-
-Returns the top 10 players sorted by their total score (correct songs + correct artists).
-
-**Response Example:**
-``` json
-[
-  {
-    "_id": "player_id",
-    "playerName": "John",
-    "correctSongGuesses": 5,
-    "correctArtistGuesses": 4,
-    "totalScore": 9,
-    "playedAt": "2025-11-24T10:30:00Z"
-  }
-]
-```
-
-#### GET /top-player
-
-Returns the single highest-scoring player.
-
-**Response Example:**
-``` json
+#### Songs Collection
+```javascript
 {
-  "playerName": "Jane",
-  "correctSongGuesses": 8,
-  "correctArtistGuesses": 7,
-  "totalCorrectGuesses": 15,
-  "timestamp": "2025-11-24T11:00:00Z"
+  _id: ObjectId,
+  songNumber: Number,
+  mp3_filename: String,
+  song_name: String,
+  artist_name: String,
+
+  // Spotify metadata
+  spotify_id: String,
+  spotify_preview_url: String,
+  spotify_uri: String,
+  album_name: String,
+  album_art_url: String,
+  release_date: String,
+  duration_ms: Number,
+  popularity: Number,
+
+  // Audio status
+  has_audio: Boolean,
+  audio_source: String,  // 'spotify_preview', 'manual_upload', or 'none'
+  audio_uploaded_at: Date,
+
+  // Metadata
+  difficulty: String,
+  category: String,
+  uploaded_by: String,
+  created_at: Date
 }
 ```
 
-#### POST /submit-guesses
-
-Submits player guesses and automatically updates the leaderboard. This endpoint
-now stores player statistics in the MongoDB `players` collection.
-
-**Request Example:**
-``` json
+#### Players Collection
+```javascript
 {
-  "playerName": "John",
-  "guesses": [
-    {
-      "songFile": "song1",
-      "songGuess": "Bohemian Rhapsody",
-      "artistGuess": "Queen"
-    }
-  ]
+  _id: ObjectId,
+  playerName: String,
+  guesses: Number,
+  correctSongGuesses: Number,
+  correctArtistGuesses: Number,
+  results: Array,
+  timestamp: Date
 }
 ```
 
-### Frontend Integration
+## Usage Guide
 
-After submitting all guesses, the frontend displays:
-- Total correct song and artist guesses
-- List of correct answers
-- Current top player with their score
+### Admin Workflow
 
-### Database Collections
+1. **Access Admin Panel**
+   ```
+   https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/admin
+   ```
 
-The application uses two MongoDB collections:
+2. **Login with Spotify**
+   - Click "Login with Spotify"
+   - Authorize the application
+   - Return to admin panel (authenticated)
 
-- **songs**: Contains song metadata (song_name, artist_name, mp3_filename)
-- **players**: Stores player statistics including:
-  - playerName
-  - guesses (total number of guesses)
-  - correctSongGuesses
-  - correctArtistGuesses
-  - results (detailed guess history)
-  - timestamp (last played time)
+3. **Import Songs**
+   - Browse your Spotify playlists
+   - Select up to 10 tracks
+   - Click "Import Selected Songs"
+   - System automatically downloads available preview clips
+   - See results: "✓ X Spotify previews auto-downloaded (30s clips)"
+
+4. **Upload Full Songs (Optional)**
+   - Go to "Manage Songs" tab
+   - For songs showing "⚠ No Audio" or to replace previews
+   - Click "Upload Audio" or "Replace Audio"
+   - Select MP3 file (max 10MB)
+   - Upload completes automatically
+
+5. **Manage Songs**
+   - View all imported songs
+   - Check audio status (Preview/Full Song/No Audio)
+   - Replace or delete songs as needed
+
+### Player Workflow
+
+1. **Access Game**
+   ```
+   https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/
+   ```
+
+2. **Play**
+   - Enter your name
+   - Click "Play Song"
+   - Listen to 30-second clips
+   - Enter song and artist guesses
+   - Get immediate feedback
+   - View final score and leaderboard
+
+## Troubleshooting
+
+### "INVALID_CLIENT: Invalid redirect URI"
+**Solution:** Update Spotify app redirect URI to match your cluster URL:
+```
+https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/admin/spotify/callback
+```
+
+### "No songs available"
+**Solution:** Import songs and ensure they have audio (either preview downloads or manual uploads)
+
+### Preview download failed
+**Reason:** Not all Spotify tracks have preview URLs available
+**Solution:** Manually upload MP3 file for that song
+
+### Session not persisting
+**Solution:** Ensure nginx route has TLS configured and cookies are enabled in browser
+
+### Audio files not persisting after pod restart
+**Solution:** Verify PVC is properly mounted and using gp3-csi storage class
+
+## Development
+
+### Building Docker Images
+
+**Backend:**
+```bash
+cd dockerfiles/middleware-node-js-app
+podman build -t quay.io/YOUR_USERNAME/middleware-spotify:latest .
+podman push quay.io/YOUR_USERNAME/middleware-spotify:latest
+```
+
+**Frontend:**
+```bash
+cd dockerfiles/fe
+podman build -t quay.io/YOUR_USERNAME/fe-spotify-admin:latest .
+podman push quay.io/YOUR_USERNAME/fe-spotify-admin:latest
+```
+
+**MongoDB:**
+```bash
+cd dockerfiles/be
+podman build -t quay.io/YOUR_USERNAME/be-mongo-db-spotify:latest .
+podman push quay.io/YOUR_USERNAME/be-mongo-db-spotify:latest
+```
+
+### Testing Locally
+
+Run with Docker Compose or Podman Compose:
+```bash
+# Set environment variables
+export SPOTIFY_CLIENT_ID='your_client_id'
+export SPOTIFY_CLIENT_SECRET='your_client_secret'
+export SPOTIFY_REDIRECT_URI='http://localhost:3000/api/admin/spotify/callback'
+
+# Start services
+docker-compose up
+```
+
+## Features Roadmap
+
+- [x] Spotify OAuth integration
+- [x] Playlist browsing and import
+- [x] Automatic preview clip downloads
+- [x] Manual audio upload
+- [x] Dynamic song loading
+- [x] Admin song management
+- [x] Player leaderboards
+- [x] Album art integration
+- [ ] Bulk audio upload
+- [ ] Category/difficulty filtering
+- [ ] Multi-round game modes
+- [ ] Social sharing
+- [ ] Audio preview playback in admin panel
+
+## Contributing
+
+Contributions welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
+
+## License
+
+This project is for educational purposes.
+
+## Support
+
+For issues and questions:
+- Check [WORKFLOW.md](WORKFLOW.md) for detailed usage guide
+- Review troubleshooting sections
+- Check OpenShift logs: `oc logs deployment/nodejs-app -n music-game-spotify`
+
+---
+
+**Note:** This application uses Spotify's preview URLs (30-second clips) which are publicly available. For full songs, you must provide your own legally sourced audio files.

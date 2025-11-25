@@ -13,20 +13,15 @@ spec:
       labels:
         app: mongodb
     spec:
-      securityContext:
-        fsGroup: 1000710000
       containers:
       - name: mongodb
-        image: quay.io/rhn_support_kquinn/be-mongo-db-artist-new:latest
+        image: quay.io/rhn_support_kquinn/be-mongo-db-spotify:latest
         ports:
         - containerPort: 27017
         volumeMounts:
         - name: mongodb-data
           mountPath: /data/db
           readOnly: false
-        securityContext:
-          runAsUser: 1000710000
-          privileged: true  # Set the container to run in privileged mode
       volumes:
       - name: mongodb-data
         persistentVolumeClaim:

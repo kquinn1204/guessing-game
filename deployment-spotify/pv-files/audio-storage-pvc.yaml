@@ -5,8 +5,8 @@ metadata:
   namespace: music-game-spotify
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 5Gi
-  storageClassName: ""
+  storageClassName: gp3-csi

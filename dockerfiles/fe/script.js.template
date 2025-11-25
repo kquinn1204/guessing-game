@@ -1,22 +1,13 @@
-const backendUrl = 'http://${BACKEND_URL}'; // Dynamically set using ConfigMap
-const songs = ['song1', 'song2', 'song3', 'song4', 'song5', 'song6', 'song7', 'song8', 'song9', 'song10'];
-const songBackgrounds = {
-    song1: 'images/song1-background.jpg',
-    song2: 'images/song2-background.jpg',
-    song3: 'images/song3-background.jpg',
-    song4: 'images/song4-background.jpg',
-    song5: 'images/song5-background.jpg',
-    song6: 'images/song6-background.jpg',
-    song7: 'images/song7-background.jpg',
-    song8: 'images/song8-background.jpg',
-    song9: 'images/song9-background.jpg',
-    song10: 'images/song10-background.jpg'
-};
+const backendUrl = ''; // Using relative URLs for nginx proxy
+let songs = []; // Will be loaded dynamically from API
+let songData = []; // Full song data from API
+const songBackgrounds = {}; // Will use album art from Spotify
 
 let currentSongIndex = 0;
 let guesses = [];
 let playerName = '';
 let currentLeaderboardFilter = 'all';
+let songsLoaded = false;
 
 // DOM elements
 const audioElement = document.getElementById('audioPlayer');
@@ -42,17 +33,67 @@ const filterAllTime = document.getElementById('filterAllTime');
 const filterWeekly = document.getElementById('filterWeekly');
 const filterDaily = document.getElementById('filterDaily');
 
-// Load player name from localStorage
-window.addEventListener('DOMContentLoaded', () => {
+// Load available songs from API
+async function loadAvailableSongs() {
+    try {
+        resultElement.innerText = 'Loading available songs...';
+        const response = await fetch(`${backendUrl}/api/available-songs`);
+
+        if (!response.ok) {
+            throw new Error('Failed to load songs');
+        }
+
+        songData = await response.json();
+
+        if (songData.length === 0) {
+            resultElement.innerText = 'No songs available yet. Please contact the admin to upload songs.';
+            playSongBtn.disabled = true;
+            return false;
+        }
+
+        // Extract song file names for the game
+        songs = songData.map(song => song.songFile);
+
+        // Build song backgrounds using album art
+        songData.forEach(song => {
+            if (song.album_art_url) {
+                songBackgrounds[song.songFile] = song.album_art_url;
+            }
+        });
+
+        songsLoaded = true;
+        resultElement.innerText = `${songs.length} songs loaded! Enter your name to start playing.`;
+        return true;
+    } catch (error) {
+        console.error('Error loading songs:', error);
+        resultElement.innerText = 'Error loading songs. Please refresh the page and try again.';
+        playSongBtn.disabled = true;
+        return false;
+    }
+}
+
+// Load player name from localStorage and load songs
+window.addEventListener('DOMContentLoaded', async () => {
     const savedName = localStorage.getItem('playerName');
     if (savedName) {
         playerNameInput.value = savedName;
     }
+
+    // Load available songs on page load
+    await loadAvailableSongs();
 });
 
 function updateBackgroundImage(song) {
     const background = songBackgrounds[song] || 'images/default-background.jpg';
-    document.body.style.backgroundImage = `url(${background})`;
+    // For external URLs (Spotify album art), use them directly
+    // For local images, use the images directory
+    if (background.startsWith('http')) {
+        document.body.style.backgroundImage = `url(${background})`;
+    } else {
+        document.body.style.backgroundImage = `url(${background})`;
+    }
+    document.body.style.backgroundSize = 'cover';
+    document.body.style.backgroundPosition = 'center';
 }
 
 function updateProgressIndicator() {
@@ -233,7 +274,7 @@ function displayLeaderboard(leaderboard) {
     `).join('');
 }
 
-function resetGame() {
+async function resetGame() {
     currentSongIndex = 0;
     guesses = [];
 
@@ -256,18 +297,31 @@ function resetGame() {
     document.getElementById('songGuessInput').value = '';
     document.getElementById('artistGuessInput').value = '';
 
-    resultElement.innerText = `Welcome back, ${playerName}! Click "Play Song" to start.`;
+    // Reload songs in case new ones were added
+    await loadAvailableSongs();
+
+    if (songsLoaded && songs.length > 0) {
+        resultElement.innerText = `Welcome back, ${playerName}! ${songs.length} songs ready. Click "Play Song" to start.`;
+    } else {
+        resultElement.innerText = 'No songs available at the moment.';
+        playSongBtn.disabled = true;
+    }
 }
 
 // Event Listeners
 setPlayerNameBtn.addEventListener('click', () => {
     const name = playerNameInput.value.trim();
     if (name) {
+        if (!songsLoaded || songs.length === 0) {
+            resultElement.innerText = 'No songs available. Please wait or contact admin.';
+            return;
+        }
+
         playerName = name;
         // Save to localStorage
         localStorage.setItem('playerName', name);
 
-        resultElement.innerText = `Welcome, ${playerName}! Click "Play Song" to start.`;
+        resultElement.innerText = `Welcome, ${playerName}! ${songs.length} songs ready. Click "Play Song" to start.`;
         playSongBtn.disabled = false;
         setPlayerNameBtn.disabled = true;
         playerNameInput.disabled = true;

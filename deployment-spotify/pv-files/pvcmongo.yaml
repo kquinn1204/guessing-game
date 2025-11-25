@@ -9,4 +9,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
-  storageClassName: manual  # Match this with the storageClassName in the PV if used
+  storageClassName: gp3-csi  # Using default storage class

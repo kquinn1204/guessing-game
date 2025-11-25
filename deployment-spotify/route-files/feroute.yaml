@@ -9,3 +9,6 @@ spec:
     name: frontend-html-service
   port:
     targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

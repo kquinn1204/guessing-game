@@ -7,6 +7,7 @@ const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 
 // Simple Levenshtein distance function for fuzzy matching
 function levenshteinDistance(str1, str2) {
@@ -42,9 +43,41 @@ function fuzzyMatch(guess, actual) {
     return distance <= maxDistance;
 }
 
+// Download Spotify preview MP3 to local storage
+async function downloadSpotifyPreview(previewUrl, filename) {
+    return new Promise((resolve, reject) => {
+        if (!previewUrl) {
+            reject(new Error('No preview URL provided'));
+            return;
+        }
+
+        const filePath = path.join(AUDIO_UPLOAD_DIR, filename);
+        const file = fs.createWriteStream(filePath);
+
+        https.get(previewUrl, (response) => {
+            if (response.statusCode !== 200) {
+                reject(new Error(`Failed to download: ${response.statusCode}`));
+                return;
+            }
+
+            response.pipe(file);
+
+            file.on('finish', () => {
+                file.close();
+                console.log(`Downloaded Spotify preview: ${filename}`);
+                resolve(filePath);
+            });
+        }).on('error', (err) => {
+            fs.unlink(filePath, () => {}); // Delete partial file
+            reject(err);
+        });
+    });
+}
+
 // Create an Express application
 const app = express();
 const port = process.env.PORT || 3000;
+const FRONTEND_URL = process.env.FRONTEND_URL || '';
 
 // Session middleware for admin authentication
 app.use(session({
@@ -188,11 +221,11 @@ app.get('/api/admin/spotify/callback', async (req, res) => {
 
     if (error) {
         console.error('Spotify OAuth error:', error);
-        return res.redirect('/admin?error=spotify_auth_failed');
+        return res.redirect(`${FRONTEND_URL}/admin?error=spotify_auth_failed`);
     }
 
     if (!code) {
-        return res.redirect('/admin?error=no_code');
+        return res.redirect(`${FRONTEND_URL}/admin?error=no_code`);
     }
 
     try {
@@ -212,10 +245,10 @@ app.get('/api/admin/spotify/callback', async (req, res) => {
         console.log('Spotify OAuth successful');
 
         // Redirect to admin panel
-        res.redirect('/admin?auth=success');
+        res.redirect(`${FRONTEND_URL}/admin?auth=success`);
     } catch (error) {
         console.error('Error exchanging code for token:', error);
-        res.redirect('/admin?error=token_exchange_failed');
+        res.redirect(`${FRONTEND_URL}/admin?error=token_exchange_failed`);
     }
 });
 
@@ -325,11 +358,31 @@ app.post('/api/admin/spotify/import-playlist', requireAuth, async (req, res) => 
         let nextSongNumber = maxSong ? maxSong.songNumber + 1 : 1;
 
         const importedSongs = [];
+        const downloadResults = [];
 
         for (const track of tracks) {
+            const filename = `spotify_${track.id}_${Date.now()}.mp3`;
+            let hasAudio = false;
+            let audioSource = 'none';
+
+            // Try to download Spotify preview if available
+            if (track.preview_url) {
+                try {
+                    await downloadSpotifyPreview(track.preview_url, filename);
+                    hasAudio = true;
+                    audioSource = 'spotify_preview';
+                    downloadResults.push({ track: track.name, status: 'preview_downloaded' });
+                } catch (error) {
+                    console.error(`Failed to download preview for ${track.name}:`, error.message);
+                    downloadResults.push({ track: track.name, status: 'preview_failed', error: error.message });
+                }
+            } else {
+                downloadResults.push({ track: track.name, status: 'no_preview_available' });
+            }
+
             const songDoc = {
                 songNumber: nextSongNumber++,
-                mp3_filename: `song${nextSongNumber - 1}.mp3`, // Placeholder, will be updated when audio is uploaded
+                mp3_filename: filename,
                 song_name: track.name,
                 artist_name: track.artist,
 
@@ -344,7 +397,8 @@ app.post('/api/admin/spotify/import-playlist', requireAuth, async (req, res) => 
                 popularity: track.popularity,
 
                 // Game metadata
-                has_audio: false, // Will be set to true when audio file is uploaded
+                has_audio: hasAudio,
+                audio_source: audioSource, // 'spotify_preview', 'manual_upload', or 'none'
                 difficulty: 'medium',
                 category: req.body.category || 'spotify-import',
                 uploaded_by: req.session.spotifyUserId || 'admin',
@@ -355,9 +409,15 @@ app.post('/api/admin/spotify/import-playlist', requireAuth, async (req, res) => 
             importedSongs.push(songDoc);
         }
 
+        const previewsDownloaded = downloadResults.filter(r => r.status === 'preview_downloaded').length;
+        const noPreviewAvailable = downloadResults.filter(r => r.status === 'no_preview_available').length;
+
         res.json({
             message: `Successfully imported ${importedSongs.length} songs`,
-            songs: importedSongs
+            previewsDownloaded: previewsDownloaded,
+            noPreviewAvailable: noPreviewAvailable,
+            songs: importedSongs,
+            downloadResults: downloadResults
         });
     } catch (error) {
         console.error('Error importing playlist:', error);
@@ -456,6 +516,7 @@ app.post('/api/admin/upload-audio/:id', requireAuth, upload.single('audioFile'),
                 $set: {
                     mp3_filename: filename,
                     has_audio: true,
+                    audio_source: 'manual_upload', // Mark as manually uploaded
                     audio_uploaded_at: new Date()
                 }
             }
@@ -502,6 +563,34 @@ app.get('/audio/:filename', async (req, res) => {
 // ========================================
 // GAME ENDPOINTS
 // ========================================
+
+// GET route to fetch available songs for the game (public endpoint)
+app.get('/api/available-songs', async (req, res) => {
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+
+        // Only return songs that have audio files uploaded
+        const songs = await songsCollection
+            .find({ has_audio: true })
+            .sort({ songNumber: 1 })
+            .toArray();
+
+        // Return minimal data needed for the game
+        const gameSongs = songs.map(song => ({
+            songFile: song.mp3_filename.replace('.mp3', ''), // Remove .mp3 extension for frontend
+            mp3_filename: song.mp3_filename,
+            song_name: song.song_name,
+            artist_name: song.artist_name,
+            album_art_url: song.album_art_url
+        }));
+
+        res.json(gameSongs);
+    } catch (error) {
+        console.error('Error fetching available songs:', error);
+        res.status(500).json({ error: 'Failed to fetch available songs' });
+    }
+});
 
 // POST route to handle guesses from the frontend
 app.post('/submit-guesses', async (req, res) => {

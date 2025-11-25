@@ -16,18 +16,17 @@ http {
         listen 8080;
         server_name localhost;
 
-        # Serve admin panel
-        location /admin {
-            alias /usr/share/nginx/html;
-            index admin.html;
-            try_files /admin.html =404;
-        }
-
         # Serve static files from /usr/share/nginx/html
         location / {
             root /usr/share/nginx/html;
             index index.html;
             try_files $uri $uri/ =404; # Return a 404 if file not found
+        }
+
+        # Serve admin panel - MUST come after / to allow static files like admin-script.js
+        location = /admin {
+            root /usr/share/nginx/html;
+            try_files /admin.html =404;
         }
 
         # Proxy requests to the backend Node.js service for /submit-guesses
@@ -36,6 +35,8 @@ http {
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Cookie $http_cookie;  # Forward cookies
+            proxy_pass_header Set-Cookie;           # Forward Set-Cookie responses
 
             # CORS headers if needed
             # add_header 'Access-Control-Allow-Origin' '*';
@@ -49,6 +50,8 @@ http {
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Cookie $http_cookie;  # Forward cookies
+            proxy_pass_header Set-Cookie;           # Forward Set-Cookie responses
 
             # CORS headers if needed
             # add_header 'Access-Control-Allow-Origin' '*';

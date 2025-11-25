@@ -1,5 +1,5 @@
-// Backend URL (will be replaced by envsubst)
-const BACKEND_URL = '${BACKEND_URL}';
+// Backend URL - using relative URLs for nginx proxy
+const BACKEND_URL = '';
 
 // State management
 let currentPlaylistId = null;
@@ -317,7 +317,20 @@ importBtn.addEventListener('click', async () => {
         }
 
         const result = await response.json();
-        showSuccess(`Successfully imported ${result.songs.length} songs! You can now upload audio files for them.`);
+
+        // Build detailed success message
+        let message = `Successfully imported ${result.songs.length} songs!\n`;
+        if (result.previewsDownloaded > 0) {
+            message += `✓ ${result.previewsDownloaded} Spotify previews auto-downloaded (30s clips)\n`;
+        }
+        if (result.noPreviewAvailable > 0) {
+            message += `⚠ ${result.noPreviewAvailable} songs need manual upload (no Spotify preview available)`;
+        }
+
+        showSuccess(message);
+
+        // Reload songs table to show new imports
+        await loadSongs();
 
         // Reset selection
         selectedTracks.clear();
@@ -400,14 +413,31 @@ function createSongRow(song) {
 
     const albumArt = song.album_art_url || 'https://via.placeholder.com/40x40?text=No+Image';
 
+    // Determine audio status and badge text
+    let statusBadgeClass = 'no-audio';
+    let statusText = '⚠ No Audio';
+
+    if (song.has_audio) {
+        if (song.audio_source === 'spotify_preview') {
+            statusBadgeClass = 'has-preview';
+            statusText = '🎵 Preview (30s)';
+        } else if (song.audio_source === 'manual_upload') {
+            statusBadgeClass = 'has-audio';
+            statusText = '✓ Full Song';
+        } else {
+            statusBadgeClass = 'has-audio';
+            statusText = '✓ Has Audio';
+        }
+    }
+
     row.innerHTML = `
         <td><img src="${albumArt}" alt="${song.song_name}" class="album-art-small"></td>
         <td>${song.song_name}</td>
         <td>${song.artist_name}</td>
         <td>${song.album_name || 'N/A'}</td>
         <td>
-            <span class="status-badge ${song.has_audio ? 'has-audio' : 'no-audio'}">
-                ${song.has_audio ? '✓ Has Audio' : '⚠ No Audio'}
+            <span class="status-badge ${statusBadgeClass}">
+                ${statusText}
             </span>
         </td>
         <td>

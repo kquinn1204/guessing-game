@@ -326,6 +326,11 @@
             color: #155724;
         }
 
+        .status-badge.has-preview {
+            background: #cfe2ff;
+            color: #084298;
+        }
+
         .status-badge.no-audio {
             background: #fff3cd;
             color: #856404;
@@ -360,7 +365,7 @@
             <h1>🎵 Admin Panel</h1>
             <div class="auth-section">
                 <span id="authStatus" class="auth-status not-authenticated">Not Authenticated</span>
-                <a href="${BACKEND_URL}/api/admin/spotify/login" class="btn btn-primary" id="loginBtn">Login with Spotify</a>
+                <a href="/api/admin/spotify/login" class="btn btn-primary" id="loginBtn">Login with Spotify</a>
                 <button class="btn btn-danger hidden" id="logoutBtn">Logout</button>
             </div>
         </header>

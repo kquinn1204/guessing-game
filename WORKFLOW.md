@@ -15,11 +15,12 @@ This document provides a step-by-step guide for using the Spotify integration fe
 
 The Spotify integration allows admins to:
 1. **Import song metadata** from their Spotify playlists (song names, artists, album art)
-2. **Upload audio files** (30-second MP3 clips) for each imported song
-3. **Manage songs** (view, update, delete)
-4. **Publish games** for players to enjoy
+2. **Automatically download Spotify preview clips** (30-second snippets) when available
+3. **Manually upload audio files** for songs without previews or to use full songs
+4. **Manage songs** (view, update, delete)
+5. **Publish games** for players to enjoy
 
-**Important**: Spotify deprecated the preview_url endpoint in November 2024, so audio files **must be manually sourced and uploaded** by the admin. The system only imports metadata (song names, artists, album info).
+**Hybrid Audio System**: The system automatically downloads 30-second Spotify preview clips during import when available. For songs without previews or to use full songs, admins can manually upload MP3 files.
 
 ---
 
@@ -27,9 +28,9 @@ The Spotify integration allows admins to:
 
 ### Prerequisites
 - Spotify account with playlists
-- 30-second MP3 clips of songs you want to use (sourced legally from CDs, purchases, etc.)
 - Access to the admin panel
 - **Spotify app redirect URI updated (see below)**
+- *Optional:* Full-length MP3 files to replace preview clips or for songs without previews
 
 ### Step 0: Update Spotify Redirect URI (FIRST TIME SETUP)
 
@@ -131,13 +132,17 @@ The Spotify integration allows admins to:
 
 3. Click the **"Import Selected Songs"** button
 
-4. Success message appears: "Successfully imported X songs! You can now upload audio files for them."
+4. Success message appears showing:
+   - "Successfully imported X songs!"
+   - "✓ Y Spotify previews auto-downloaded (30s clips)" (if any had previews)
+   - "⚠ Z songs need manual upload (no Spotify preview available)" (if any lacked previews)
 
 5. The songs are now in your database with:
    - ✅ Song metadata (name, artist, album, album art)
-   - ❌ No audio files yet (`has_audio: false`)
+   - ✅ Auto-downloaded 30-second preview clips (for songs with Spotify previews)
+   - ⚠️ Songs without previews need manual upload
 
-### Step 5: Upload Audio Files
+### Step 5: Manage Audio Files
 
 1. Click the **"Manage Songs"** tab
 
@@ -149,25 +154,35 @@ The Spotify integration allows admins to:
    | Song | Song name |
    | Artist | Artist name |
    | Album | Album name |
-   | Status | "⚠️ No Audio" or "✓ Has Audio" |
+   | Status | "⚠️ No Audio", "🎵 Preview (30s)", or "✓ Full Song" |
    | Actions | Upload/Replace/Delete buttons |
 
-3. For each song **without audio**:
+3. **Audio Status Meanings**:
+   - **🎵 Preview (30s)** (blue badge) - Spotify preview clip auto-downloaded, ready to play
+   - **✓ Full Song** (green badge) - Manually uploaded full MP3 file
+   - **⚠️ No Audio** (yellow badge) - No Spotify preview available, needs manual upload
+
+4. **For songs with "⚠️ No Audio"** (manual upload required):
    - Click the **"Upload Audio"** button in that song's row
    - File picker opens automatically
-   - Select the 30-second MP3 clip for that song
+   - Select your MP3 file for that song
    - Click "Open"
+   - Upload completes automatically
+   - Status changes to "✓ Full Song"
 
-4. Upload process:
+5. **To replace preview clips with full songs** (optional):
+   - Songs with "🎵 Preview (30s)" are already playable
+   - Click "Replace Audio" to upload full version
+   - Select MP3 file
+   - Old preview clip is automatically deleted
+   - Status changes to "✓ Full Song"
+
+6. **Upload process**:
    - Message shows: "Uploading audio file..."
    - File is validated (must be MP3, max 10MB)
    - Upload happens automatically
    - Success message: "Audio file uploaded successfully!"
    - Table refreshes automatically
-
-5. After upload, the song's status changes:
-   - ⚠️ "No Audio" → ✓ "Has Audio" (green badge)
-   - Button changes: "Upload Audio" → "Replace Audio"
 
 ### Step 6: Manage Your Songs
 
@@ -195,9 +210,10 @@ The Spotify integration allows admins to:
 ### Step 7: Verify Game is Ready
 
 Songs are ready for players when:
-- ✅ Status shows "✓ Has Audio" (green)
+- ✅ Status shows "🎵 Preview (30s)" (blue) or "✓ Full Song" (green)
 - ✅ You can see the album art
 - ✅ All song metadata is correct
+- ✅ At least one song has audio available
 
 **Logout:**
 - Click "Logout" button when done
@@ -299,8 +315,9 @@ Songs are ready for players when:
   album_art_url: "https://i.scdn.co/image/...",
 
   // Audio file info
-  mp3_filename: "507f1f77bcf86cd799439011_1732461234567.mp3",
+  mp3_filename: "spotify_4RiGHUVnNJN3TLjZ7ZLlWo_1732461234567.mp3",
   has_audio: true,
+  audio_source: "spotify_preview",  // or "manual_upload" or "none"
   audio_uploaded_at: "2025-11-24T10:30:00Z",
 
   // Game metadata
@@ -310,28 +327,38 @@ Songs are ready for players when:
 }
 ```
 
-**Automatic Linking Process:**
+**Automatic Process:**
 
-1. **Import Metadata:**
+1. **Import with Preview Download:**
    - Admin imports "Born to Run" from Spotify
-   - MongoDB creates document with unique `_id`
-   - `has_audio: false`
+   - System checks if Spotify preview URL exists
+   - If preview available:
+     - Downloads 30s clip automatically
+     - Saves as: `spotify_4RiGHUVnNJN3TLjZ7ZLlWo_1732461234567.mp3`
+     - Sets `has_audio: true` and `audio_source: "spotify_preview"`
+   - If no preview:
+     - Sets `has_audio: false` and `audio_source: "none"`
+     - Admin can upload manually later
 
-2. **Upload Audio:**
-   - Admin clicks "Upload Audio" next to "Born to Run"
-   - System knows the song's `_id: 507f1f77bcf86cd799439011`
-   - File uploaded as: `507f1f77bcf86cd799439011_1732461234567.mp3`
+2. **Manual Upload (Optional):**
+   - Admin clicks "Upload Audio" or "Replace Audio"
+   - System knows the song's `_id` and Spotify ID
+   - File uploaded as: `spotify_4RiGHUVnNJN3TLjZ7ZLlWo_TIMESTAMP.mp3`
+   - Old file automatically deleted
    - Database updated:
-     - `mp3_filename: "507f1f77bcf86cd799439011_1732461234567.mp3"`
+     - `mp3_filename: "spotify_4RiGHUVnNJN3TLjZ7ZLlWo_TIMESTAMP.mp3"`
      - `has_audio: true`
+     - `audio_source: "manual_upload"`
      - `audio_uploaded_at: <current timestamp>`
 
 3. **Game Loads Songs:**
+   - Frontend calls: `GET /api/available-songs`
    - Backend filters: `{ has_audio: true }`
-   - Only songs with uploaded audio are used
-   - Audio served from: `/audio/507f1f77bcf86cd799439011_1732461234567.mp3`
+   - Returns songs regardless of audio source
+   - Audio served from: `/audio/[filename]`
+   - Game adapts to number of available songs
 
-**No Manual Updates Required** - Everything is automatic!
+**No Manual Database Updates Required** - Everything is automatic!
 
 ### File Storage
 
@@ -342,10 +369,11 @@ Songs are ready for players when:
 - Files persist through pod restarts
 
 **File Naming:**
-- Format: `{songId}_{timestamp}.mp3`
-- Example: `507f1f77bcf86cd799439011_1732461234567.mp3`
+- Auto-downloaded previews: `spotify_{spotify_id}_{timestamp}.mp3`
+- Example: `spotify_4RiGHUVnNJN3TLjZ7ZLlWo_1732461234567.mp3`
+- Manually uploaded: `{songId}_{timestamp}.mp3`
 - Unique per song
-- Old files deleted on replacement
+- Old files automatically deleted on replacement
 
 ### Audio Validation
 

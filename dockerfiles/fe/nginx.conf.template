@@ -12,6 +12,9 @@ http {
     access_log /var/log/nginx/access.log;
     error_log /var/log/nginx/error.log;
 
+    # Allow larger file uploads (for MP3 files)
+    client_max_body_size 20M;
+
     server {
         listen 8080;
         server_name localhost;
@@ -57,6 +60,22 @@ http {
             # add_header 'Access-Control-Allow-Origin' '*';
             # add_header 'Access-Control-Allow-Methods' 'GET, POST';
             # add_header 'Access-Control-Allow-Headers' 'Content-Type';
+        }
+
+        # Proxy requests for audio files
+        location /audio/ {
+            proxy_pass http://$BACKEND_URL; # Proxy to backend audio endpoint
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
+        # Proxy requests for leaderboard
+        location /leaderboard {
+            proxy_pass http://$BACKEND_URL; # Proxy to backend leaderboard endpoint
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         }
 
         # Serve /config files from NGINX, as before

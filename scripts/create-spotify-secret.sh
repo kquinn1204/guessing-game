@@ -3,15 +3,15 @@
 
 echo "Creating Spotify credentials secret in music-game-spotify namespace..."
 
-# Get the actual route hostname
-ROUTE_HOST=$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}' 2>/dev/null)
+# Get the actual route hostname - use FRONTEND route (nginx) not backend
+FRONTEND_ROUTE=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}' 2>/dev/null)
 
-if [ -z "$ROUTE_HOST" ]; then
-  echo "⚠️  Warning: nodejs-route not found yet. Using placeholder URL."
+if [ -z "$FRONTEND_ROUTE" ]; then
+  echo "⚠️  Warning: nginx-route not found yet. Using placeholder URL."
   echo "You will need to update this secret after routes are created."
   REDIRECT_URI="https://PLACEHOLDER/api/admin/spotify/callback"
 else
-  REDIRECT_URI="https://${ROUTE_HOST}/api/admin/spotify/callback"
+  REDIRECT_URI="https://${FRONTEND_ROUTE}/api/admin/spotify/callback"
   echo "Using redirect URI: $REDIRECT_URI"
 fi
 

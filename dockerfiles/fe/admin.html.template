@@ -357,6 +357,42 @@
             border-radius: 4px;
             object-fit: cover;
         }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            right: 15px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -406,8 +442,13 @@
 
         <!-- Manage Songs Section -->
         <div id="manageSongsSection" class="section hidden">
-            <h2 class="section-title">Manage Songs</h2>
-            <p>Upload audio files for imported songs. Only songs with audio can be used in the game.</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div>
+                    <h2 class="section-title" style="margin: 0;">Manage Songs</h2>
+                    <p style="margin: 5px 0 0 0;">Upload audio files for imported songs. Only songs with audio can be used in the game.</p>
+                </div>
+                <button class="btn btn-primary" onclick="showAddSongModal()">+ Add New Song</button>
+            </div>
             <div class="loading" id="songsLoading">Loading songs...</div>
             <table class="songs-table hidden" id="songsTable">
                 <thead>
@@ -424,6 +465,28 @@
                     <!-- Songs will be inserted here -->
                 </tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Add Song Modal -->
+    <div id="addSongModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeAddSongModal()">&times;</span>
+            <h2>Add New Song</h2>
+            <form id="addSongForm" onsubmit="handleAddSong(event)">
+                <div style="margin-bottom: 15px;">
+                    <label for="newSongName" style="display: block; margin-bottom: 5px; font-weight: bold;">Song Name:</label>
+                    <input type="text" id="newSongName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <label for="newArtistName" style="display: block; margin-bottom: 5px; font-weight: bold;">Artist Name:</label>
+                    <input type="text" id="newArtistName" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                </div>
+                <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddSongModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Song</button>
+                </div>
+            </form>
         </div>
     </div>
 

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: music-game-spotify
+data:
+  # Internal service name - this will always be the same regardless of cluster
+  # Service port is 80 (which maps to container port 3000), so no port needed
+  BACKEND_URL: "nodejs-service"

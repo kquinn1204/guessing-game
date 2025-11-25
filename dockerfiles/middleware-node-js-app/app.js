@@ -438,6 +438,39 @@ app.get('/api/admin/songs', requireAuth, async (req, res) => {
     }
 });
 
+// Create new song
+app.post('/api/admin/songs', requireAuth, async (req, res) => {
+    try {
+        await connectToDatabase();
+        const songsCollection = db.collection('songs');
+
+        // Get the highest songNumber to assign the next number
+        const lastSong = await songsCollection.find({}).sort({ songNumber: -1 }).limit(1).toArray();
+        const nextSongNumber = lastSong.length > 0 ? lastSong[0].songNumber + 1 : 1;
+
+        // Create new song document
+        const newSong = {
+            songNumber: nextSongNumber,
+            song_name: req.body.song_name || 'Untitled',
+            artist_name: req.body.artist_name || 'Unknown Artist',
+            mp3_filename: `song${nextSongNumber}.mp3`,
+            has_audio: false,
+            created_at: new Date()
+        };
+
+        const result = await songsCollection.insertOne(newSong);
+
+        res.json({
+            message: 'Song created successfully',
+            songId: result.insertedId,
+            song: newSong
+        });
+    } catch (error) {
+        console.error('Error creating song:', error);
+        res.status(500).json({ error: 'Failed to create song' });
+    }
+});
+
 // Update song metadata
 app.put('/api/admin/songs/:id', requireAuth, async (req, res) => {
     try {

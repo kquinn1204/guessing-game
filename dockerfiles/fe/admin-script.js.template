@@ -532,3 +532,48 @@ window.deleteSong = async function(songId) {
         showError('Failed to delete song. Please try again.');
     }
 };
+
+// Show add song modal
+window.showAddSongModal = function() {
+    document.getElementById('addSongModal').style.display = 'flex';
+};
+
+// Close add song modal
+window.closeAddSongModal = function() {
+    document.getElementById('addSongModal').style.display = 'none';
+    document.getElementById('addSongForm').reset();
+};
+
+// Handle add song form submission
+window.handleAddSong = async function(event) {
+    event.preventDefault();
+
+    const songName = document.getElementById('newSongName').value;
+    const artistName = document.getElementById('newArtistName').value;
+
+    try {
+        const response = await fetch(`${BACKEND_URL}/api/admin/songs`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify({
+                song_name: songName,
+                artist_name: artistName
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create song');
+        }
+
+        const data = await response.json();
+        showSuccess(`Song created successfully! Now you can upload an MP3 file for "${songName}".`);
+        closeAddSongModal();
+        await loadSongs();
+    } catch (error) {
+        console.error('Error creating song:', error);
+        showError('Failed to create song. Please try again.');
+    }
+};

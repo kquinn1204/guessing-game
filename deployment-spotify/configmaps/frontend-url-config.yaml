@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-url-config
+  namespace: music-game-spotify
+data:
+  # This gets dynamically set during deployment based on the actual route
+  # For now using a placeholder - should be updated by deployment script
+  FRONTEND_URL: "https://PLACEHOLDER_FRONTEND_ROUTE"

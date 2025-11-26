@@ -26,10 +26,10 @@ oc apply -f deployment-spotify/route-files/
 # 5. Create ConfigMaps
 echo "⚙️  Creating ConfigMaps..."
 NGINX_ROUTE=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
-NODEJS_ROUTE=$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}')
 
+# Backend URL should use internal service name for nginx proxy
 oc create configmap backend-config -n music-game-spotify \
-  --from-literal=BACKEND_URL=${NODEJS_ROUTE} \
+  --from-literal=BACKEND_URL=nodejs-service \
   --dry-run=client -o yaml | oc apply -f -
 
 oc create configmap frontend-config -n music-game-spotify \

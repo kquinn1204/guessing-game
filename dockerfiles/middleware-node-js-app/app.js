@@ -85,8 +85,9 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     cookie: {
-        secure: process.env.NODE_ENV === 'production',
+        secure: true, // Always use secure cookies since we're behind HTTPS ingress
         httpOnly: true,
+        sameSite: 'lax', // Allow cookies in OAuth redirects
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
@@ -94,9 +95,9 @@ app.use(session({
 // Middleware to parse incoming JSON requests
 app.use(bodyParser.json());
 
-// Allow all origins (CORS policy for open access)
+// CORS configuration - must specify origin when using credentials
 app.use(cors({
-    origin: '*',
+    origin: FRONTEND_URL || true, // Use FRONTEND_URL env var, or allow request origin
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type'],
     credentials: true

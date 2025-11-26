@@ -79,6 +79,9 @@ const app = express();
 const port = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '';
 
+// Trust proxy - required for secure cookies behind nginx/ingress
+app.set('trust proxy', 1);
+
 // Session middleware for admin authentication
 app.use(session({
     secret: process.env.SESSION_SECRET || 'music-game-admin-secret-key',

@@ -152,7 +152,7 @@ oc apply -f html_deploy_fe.yaml
 
 **Node.js Backend:**
 - Deployment: `nodejs-app`
-- Replicas: 3 (can run multiple on same node with ReadWriteOnce PVC)
+- **Replicas: 1** (MUST be 1 - sessions stored in memory, not shared between pods)
 - Image: `quay.io/rhn_support_kquinn/middleware-spotify:latest`
 - Environment variables:
   - `MONGO_URL`: MongoDB connection string
@@ -162,6 +162,7 @@ oc apply -f html_deploy_fe.yaml
   - `FRONTEND_URL`: For OAuth redirects (from frontend-url-config ConfigMap)
   - `AUDIO_UPLOAD_DIR`: `/usr/src/app/uploads/audio`
 - Audio storage mounted at `/usr/src/app/uploads`
+- **Note**: Admin sessions use in-memory storage. Multiple replicas will break authentication due to OAuth callback hitting different pods. For production with multiple replicas, implement shared session storage (Redis/MongoDB).
 
 **Nginx Frontend:**
 - Deployment: `nginx-deployment`

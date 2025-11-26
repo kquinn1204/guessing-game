@@ -20,7 +20,7 @@ This guide walks you through setting up Spotify API integration for the music gu
    - **Redirect URIs**: Add BOTH of these:
      ```
      http://127.0.0.1:3000/api/admin/spotify/callback
-     https://nodejs-route-music-game.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
+     https://nginx-route-music-game.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
      ```
 5. Check **"I understand and agree with Spotify's Developer Terms of Service and Design Guidelines"**
 6. Click **"Save"**
@@ -48,7 +48,7 @@ We'll create a Kubernetes Secret to securely store these credentials:
 oc create secret generic spotify-credentials \
   --from-literal=SPOTIFY_CLIENT_ID='your_client_id_here' \
   --from-literal=SPOTIFY_CLIENT_SECRET='your_client_secret_here' \
-  --from-literal=SPOTIFY_REDIRECT_URI='https://nodejs-route-music-game.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback' \
+  --from-literal=SPOTIFY_REDIRECT_URI='https://nginx-route-music-game.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback' \
   -n music-game
 ```
 

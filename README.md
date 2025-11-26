@@ -45,7 +45,7 @@ This will:
 After deployment, update your Spotify app with the redirect URI shown in the deployment output:
 
 ```bash
-https://nodejs-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/admin/spotify/callback
+https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/admin/spotify/callback
 ```
 
 ## Deployment Guide
@@ -145,20 +145,21 @@ oc apply -f html_deploy_fe.yaml
 
 **MongoDB:**
 - Deployment: `mongodb`
-- Replicas: 2
+- **Replicas: 1** (IMPORTANT: Must be 1 due to ReadWriteOnce PVC to avoid lock conflicts)
 - Image: `quay.io/rhn_support_kquinn/be-mongo-db-spotify:latest`
 - Persistent storage mounted at `/data/db`
+- Note: Do not scale to 2+ replicas - causes `mongod.lock` conflicts
 
 **Node.js Backend:**
 - Deployment: `nodejs-app`
-- Replicas: 1 (due to ReadWriteOnce PVC constraint)
+- Replicas: 3 (can run multiple on same node with ReadWriteOnce PVC)
 - Image: `quay.io/rhn_support_kquinn/middleware-spotify:latest`
 - Environment variables:
   - `MONGO_URL`: MongoDB connection string
   - `SPOTIFY_CLIENT_ID`: From secret
   - `SPOTIFY_CLIENT_SECRET`: From secret
   - `SPOTIFY_REDIRECT_URI`: From secret
-  - `FRONTEND_URL`: For OAuth redirects
+  - `FRONTEND_URL`: For OAuth redirects (from frontend-url-config ConfigMap)
   - `AUDIO_UPLOAD_DIR`: `/usr/src/app/uploads/audio`
 - Audio storage mounted at `/usr/src/app/uploads`
 
@@ -167,6 +168,7 @@ oc apply -f html_deploy_fe.yaml
 - Replicas: 1
 - Image: `quay.io/rhn_support_kquinn/fe-spotify-admin:latest`
 - Dynamic configuration via envsubst
+- **Proxies /api/ requests to internal nodejs-service** (not external route)
 - Cookie forwarding for session management
 
 ## Application Architecture
@@ -315,23 +317,74 @@ The game frontend:
 
 ## Troubleshooting
 
-### "INVALID_CLIENT: Invalid redirect URI"
+### Deployment Issues
+
+#### "ERR_TOO_MANY_REDIRECTS" or redirect loop
+**Symptom:** Accessing `/api/admin/spotify/login` causes infinite redirect loop
+
+**Cause:** The `backend-config` ConfigMap is set to external route URL instead of internal service name
+
+**Solution:**
+```bash
+# Update the ConfigMap to use internal service
+oc create configmap backend-config -n music-game-spotify \
+  --from-literal=BACKEND_URL=nodejs-service \
+  --dry-run=client -o yaml | oc apply -f -
+
+# Restart nginx to pick up the change
+oc rollout restart deployment nginx-deployment -n music-game-spotify
+```
+
+**Prevention:** The `deploy-spotify.sh` script now sets this correctly by default
+
+#### MongoDB CrashLoopBackOff - "Unable to lock mongod.lock"
+**Symptom:** One or more MongoDB pods fail to start with lock file error
+
+**Cause:** Multiple MongoDB replicas trying to use same ReadWriteOnce PVC
+
+**Solution:**
+```bash
+# Scale MongoDB to exactly 1 replica
+oc scale deployment mongodb -n music-game-spotify --replicas=1
+```
+
+**Prevention:** The deployment YAML now defaults to 1 replica
+
+#### nodejs-app pods in CreateContainerConfigError
+**Symptom:** Pods show "configmap 'frontend-url-config' not found"
+
+**Cause:** Missing ConfigMap that wasn't created by deployment script
+
+**Solution:**
+```bash
+# Create the missing ConfigMap
+NGINX_ROUTE=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
+oc create configmap frontend-url-config -n music-game-spotify \
+  --from-literal=FRONTEND_URL=https://${NGINX_ROUTE} \
+  --dry-run=client -o yaml | oc apply -f -
+```
+
+**Prevention:** The `deploy-spotify.sh` script now creates this ConfigMap automatically
+
+### Application Issues
+
+#### "INVALID_CLIENT: Invalid redirect URI"
 **Solution:** Update Spotify app redirect URI to match your cluster URL:
 ```
 https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/admin/spotify/callback
 ```
 
-### "No songs available"
+#### "No songs available"
 **Solution:** Import songs and ensure they have audio (either preview downloads or manual uploads)
 
-### Preview download failed
+#### Preview download failed
 **Reason:** Not all Spotify tracks have preview URLs available
 **Solution:** Manually upload MP3 file for that song
 
-### Session not persisting
+#### Session not persisting
 **Solution:** Ensure nginx route has TLS configured and cookies are enabled in browser
 
-### Audio files not persisting after pod restart
+#### Audio files not persisting after pod restart
 **Solution:** Verify PVC is properly mounted and using gp3-csi storage class
 
 ## Development

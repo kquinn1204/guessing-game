@@ -25,12 +25,19 @@ oc apply -f deployment-spotify/route-files/
 
 # 5. Create ConfigMaps
 echo "⚙️  Creating ConfigMaps..."
+NGINX_ROUTE=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
+NODEJS_ROUTE=$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}')
+
 oc create configmap backend-config -n music-game-spotify \
-  --from-literal=BACKEND_URL=$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}') \
+  --from-literal=BACKEND_URL=${NODEJS_ROUTE} \
   --dry-run=client -o yaml | oc apply -f -
 
 oc create configmap frontend-config -n music-game-spotify \
-  --from-literal=ALLOWED_ORIGINS=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}') \
+  --from-literal=ALLOWED_ORIGINS=${NGINX_ROUTE} \
+  --dry-run=client -o yaml | oc apply -f -
+
+oc create configmap frontend-url-config -n music-game-spotify \
+  --from-literal=FRONTEND_URL=https://${NGINX_ROUTE} \
   --dry-run=client -o yaml | oc apply -f -
 
 # 6. Create Spotify credentials secret
@@ -75,7 +82,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "Add this redirect URI to your Spotify app settings:"
 echo ""
-echo "👉 https://$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback"
+echo "👉 https://$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback"
 echo ""
 echo "Steps:"
 echo "1. Go to: https://developer.spotify.com/dashboard"

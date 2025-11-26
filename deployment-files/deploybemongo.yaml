@@ -4,7 +4,7 @@ metadata:
   name: mongodb
   namespace: music-game
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: mongodb

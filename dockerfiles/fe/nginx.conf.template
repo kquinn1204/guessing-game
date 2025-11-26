@@ -78,6 +78,14 @@ http {
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         }
 
+        # Proxy requests for top-player
+        location /top-player {
+            proxy_pass http://$BACKEND_URL; # Proxy to backend top-player endpoint
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        }
+
         # Serve /config files from NGINX, as before
         location /config {
             root /usr/share/nginx/html;

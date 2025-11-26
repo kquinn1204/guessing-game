@@ -87,7 +87,7 @@ We're using **Option A** - deploying Spotify integration in a completely separat
 ### Redirect URIs (in Spotify App Settings)
 ```
 http://127.0.0.1:3000/api/admin/spotify/callback
-https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
+https://nginx-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
 ```
 
 ### Scopes Required

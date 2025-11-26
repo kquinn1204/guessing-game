@@ -121,7 +121,7 @@ After running `./scripts/deploy-spotify.sh`, you'll see output like:
 
 Add this redirect URI to your Spotify app settings:
 
-👉 https://nodejs-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
+👉 https://nginx-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
 
 Steps:
 1. Go to: https://developer.spotify.com/dashboard
@@ -295,7 +295,7 @@ Songs now include optional Spotify metadata:
 - Check Spotify app settings
 - Ensure redirect URI matches exactly:
   ```
-  https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
+  https://nginx-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/admin/spotify/callback
   ```
 
 **"Not authenticated" error**

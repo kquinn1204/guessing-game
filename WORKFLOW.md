@@ -80,10 +80,12 @@ The Spotify integration allows admins to:
 
 1. Navigate to the admin panel URL (shown in deployment output):
    ```
-   https://nodejs-route-music-game-spotify.apps.ci-ln-XXXXXX-XXXXX.aws-4.ci.openshift.org/admin
+   https://nginx-route-music-game-spotify.apps.ci-ln-XXXXXX-XXXXX.aws-4.ci.openshift.org/admin
    ```
 
    **Note:** The exact URL will be displayed when you run `./scripts/deploy-spotify.sh`
+
+   **Important:** Use the **nginx-route** URL (not nodejs-route) - the admin panel is served by nginx
 
 2. You'll see the welcome screen with authentication status showing "Not Authenticated"
 
@@ -413,7 +415,7 @@ Songs are ready for players when:
 
 **Solutions:**
 1. Get the correct redirect URI from deployment output
-2. Or run: `echo "https://$(oc get route nodejs-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback"`
+2. Or run: `echo "https://$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')/api/admin/spotify/callback"`
 3. Go to https://developer.spotify.com/dashboard
 4. Edit your app → Redirect URIs
 5. Add the exact URL (must match exactly, including `/api/admin/spotify/callback`)
@@ -587,9 +589,11 @@ oc create configmap frontend-url-config -n music-game-spotify \
 ## Quick Reference
 
 ### URLs
-- **Admin Panel:** `https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/admin`
-- **Player Game:** `https://nginx-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/`
-- **Backend API:** `https://nodejs-route-music-game-spotify.apps.ci-ln-l20996b-76ef8.aws-4.ci.openshift.org/api/`
+- **Admin Panel:** `https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/admin`
+- **Player Game:** `https://nginx-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/`
+- **Backend API:** `https://nodejs-route-music-game-spotify.apps.YOUR-CLUSTER.openshift.org/api/`
+
+**Note:** Frontend and Admin are served by nginx-route. API endpoints are on nodejs-route.
 
 ### Admin Actions
 | Action | Tab | Button |

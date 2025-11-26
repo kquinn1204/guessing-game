@@ -245,8 +245,15 @@ app.get('/api/admin/spotify/callback', async (req, res) => {
 
         console.log('Spotify OAuth successful');
 
-        // Redirect to admin panel
-        res.redirect(`${FRONTEND_URL}/admin?auth=success`);
+        // Save session before redirecting (required when saveUninitialized: false)
+        req.session.save((err) => {
+            if (err) {
+                console.error('Session save error:', err);
+                return res.redirect(`${FRONTEND_URL}/admin?error=session_save_failed`);
+            }
+            // Redirect to admin panel after session is saved
+            res.redirect(`${FRONTEND_URL}/admin?auth=success`);
+        });
     } catch (error) {
         console.error('Error exchanging code for token:', error);
         res.redirect(`${FRONTEND_URL}/admin?error=token_exchange_failed`);

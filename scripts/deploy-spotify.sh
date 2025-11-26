@@ -33,7 +33,7 @@ oc create configmap backend-config -n music-game-spotify \
   --dry-run=client -o yaml | oc apply -f -
 
 oc create configmap frontend-config -n music-game-spotify \
-  --from-literal=ALLOWED_ORIGINS=${NGINX_ROUTE} \
+  --from-literal=ALLOWED_ORIGINS=https://${NGINX_ROUTE} \
   --dry-run=client -o yaml | oc apply -f -
 
 oc create configmap frontend-url-config -n music-game-spotify \

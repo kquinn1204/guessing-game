@@ -49,7 +49,7 @@ The Spotify integration allows admins to:
 
    Add this redirect URI to your Spotify app settings:
 
-   👉 https://nodejs-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
+   👉 https://nginx-route-music-game-spotify.apps.ci-ln-abc123-xyz89.aws-4.ci.openshift.org/api/admin/spotify/callback
 
    Steps:
    1. Go to: https://developer.spotify.com/dashboard
@@ -494,6 +494,72 @@ Songs are ready for players when:
 4. Use "Manage Songs" to update if needed
 
 ### Deployment Issues
+
+#### "ERR_TOO_MANY_REDIRECTS" when accessing /api/admin/spotify/login
+**Symptom:** Browser shows infinite redirect loop error
+
+**Cause:** nginx is proxying API requests to external route instead of internal service
+
+**Solution:**
+```bash
+# Fix the backend-config ConfigMap
+oc create configmap backend-config -n music-game-spotify \
+  --from-literal=BACKEND_URL=nodejs-service \
+  --dry-run=client -o yaml | oc apply -f -
+
+# Restart nginx to apply changes
+oc rollout restart deployment nginx-deployment -n music-game-spotify
+
+# Wait for rollout to complete
+oc rollout status deployment nginx-deployment -n music-game-spotify
+```
+
+**Why it happens:** The backend-config ConfigMap was incorrectly set to the external route hostname, causing nginx to proxy requests back through the ingress controller in a loop.
+
+**Prevention:** The `deploy-spotify.sh` script now automatically sets this to `nodejs-service`
+
+#### MongoDB pod in CrashLoopBackOff
+**Symptom:** MongoDB pod logs show "Unable to lock the lock file: /data/db/mongod.lock"
+
+**Cause:** Multiple MongoDB replicas trying to use the same ReadWriteOnce persistent volume
+
+**Solution:**
+```bash
+# Scale MongoDB to exactly 1 replica
+oc scale deployment mongodb -n music-game-spotify --replicas=1
+
+# Verify only one pod is running
+oc get pods -n music-game-spotify -l app=mongodb
+```
+
+**Why it happens:** The PVC uses ReadWriteOnce access mode, which only allows one pod to mount it at a time. MongoDB needs exclusive access to its data directory.
+
+**Prevention:** The `deployment-spotify/deploybemongo.yaml` file now defaults to 1 replica
+
+#### nodejs-app pods showing CreateContainerConfigError
+**Symptom:** nodejs-app pods fail to start with error "configmap 'frontend-url-config' not found"
+
+**Cause:** The frontend-url-config ConfigMap wasn't created during deployment
+
+**Solution:**
+```bash
+# Get the nginx route hostname
+NGINX_ROUTE=$(oc get route nginx-route -n music-game-spotify -o jsonpath='{.spec.host}')
+
+# Create the missing ConfigMap
+oc create configmap frontend-url-config -n music-game-spotify \
+  --from-literal=FRONTEND_URL=https://${NGINX_ROUTE} \
+  --dry-run=client -o yaml | oc apply -f -
+
+# Pods will automatically restart and pick up the ConfigMap
+```
+
+**Why it happens:** Earlier versions of the deployment script didn't create this ConfigMap
+
+**Prevention:** The `deploy-spotify.sh` script now automatically creates all three required ConfigMaps:
+- `backend-config` (internal service name)
+- `frontend-config` (CORS allowed origins)
+- `frontend-url-config` (OAuth redirect URL)
 
 #### Pods not starting
 **Solutions:**
